@@ -3,5 +3,5 @@
 //   rtUrl: 'https://zet-uzivo.tvojeime.workers.dev/rt'
 // Dok je prazno, aplikacija prikazuje polaske po voznom redu (siva točka).
 window.ZET_CONFIG = {
-  rtUrl: ''
+  rtUrl: 'https://zet-uzivo.damir-kevic.workers.dev/rt'
 };
