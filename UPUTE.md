@@ -27,17 +27,13 @@ ali za sve stanice i linije, i bez kućnog računala.
 
 ## Postavljanje (jednom, ~15 minuta)
 
-### 1. Cloudflare Worker (podaci uživo)
-1. Prijavi se ili otvori besplatni račun na <https://dash.cloudflare.com>.
-2. **Workers & Pages → Create → Create Worker** (predložak *Hello World*), naziv npr. `zet-uzivo` → **Deploy**.
-3. **Edit code** → obriši sve, zalijepi cijeli sadržaj `worker/worker.js` → **Deploy**.
-4. Zapiši adresu, npr. `https://zet-uzivo.TVOJE-IME.workers.dev`.
-   Provjera: otvori tu adresu + `/rt` u pregledniku – treba se skinuti datoteka (to je dobro),
-   a adresa + `/vijesti` treba pokazati obavijesti ZET-a (tekst u JSON obliku).
-5. U `app/config.js` upiši:
-   ```js
-   rtUrl: 'https://zet-uzivo.TVOJE-IME.workers.dev/rt'
-   ```
+### 1. Cloudflare Worker (podaci uživo i obavijesti) – već postavljeno
+- Worker **zet-uzivo** na računu damir.kevic@gmail.com: <https://zet-uzivo.damir-kevic.workers.dev>
+  - `/rt` – ZET-ovi podaci uživo, `/vijesti` – obavijesti ZET-a (JSON)
+- Adresa je upisana u `app/config.js` (`rtUrl`).
+- Ako se `worker/worker.js` promijeni: Cloudflare → Workers & Pages → zet-uzivo → **Edit code** →
+  zalijepi novi sadržaj → **Deploy**.
+- Besplatni plan dopušta 100.000 zahtjeva dnevno – za par mobitela je to i više nego dovoljno.
 
 ### 2. GitHub (aplikacija i noćno osvježavanje voznog reda) – već postavljeno
 - Repozitorij: <https://github.com/sonics7/tramvaji> (javan – GitHub Pages je besplatan samo za javne).
@@ -70,6 +66,10 @@ Supruga isto na svom A54 – njene grupe i linije su samo njene.
 - **＋ Dodaj liniju**:
   - *Tramvaji* / *Autobusi* → broj linije → smjer → stanica (📍 *Označi najbližu* pronađe stanicu po lokaciji), ili
   - *Po stanici* → upiši naziv ili 📍 *Najbliže stanice* → sve linije koje tamo staju.
+- **Red vožnje** (gornja kartica): odaberi liniju, smjer i stanicu (ili dodirni neku od *Tvojih linija*) i
+  datum (◀ ▶ ili dodir na datum za kalendar). Prikažu se sve planirane vožnje toga dana s vremenom
+  polaska s te stanice, po satima. Danas: prošli polasci su blijedi, sljedeći je istaknut.
+  Narančasti natpis ispod vremena znači da ta vožnja završava drugdje (npr. skraćena vožnja).
 - Minute: veliki broj je prvi polazak, zatim sljedeća dva. „sada” = manje od minute; ako je
   polazak za više od sat vremena, piše se točno vrijeme (npr. 5:12).
 - **Prijenos na drugi mobitel:** *Kopiraj / pošalji kod* → pošalji poruku → na drugom mobitelu

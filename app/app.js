@@ -20,6 +20,7 @@
     S = { cur: 0, groups: [{ name: 'Od kuće', items: [] }, { name: 'S posla', items: [] }] };
   }
   if (!(S.cur >= 0 && S.cur < S.groups.length)) S.cur = 0;
+  if (S.mode !== 'tt') S.mode = 'live';
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
   const group = () => S.groups[S.cur];
 
@@ -270,10 +271,96 @@
     return '<details class="' + cls + '"><summary>' + esc(n.title) + '<small>' + esc(fmtDate(n.at)) + ((n.lines || []).length ? ' · linije ' + esc(n.lines.join(', ')) : '') + '</small></summary>' + inner + '</details>';
   }
 
+  // ---------------- Red vožnje za odabrani dan ----------------
+  let ttDay = new Date(); ttDay.setHours(0, 0, 0, 0);
+  const DANI = ['nedjelja', 'ponedjeljak', 'utorak', 'srijeda', 'četvrtak', 'petak', 'subota'];
+  const MJ = ['siječnja', 'veljače', 'ožujka', 'travnja', 'svibnja', 'lipnja', 'srpnja', 'kolovoza', 'rujna', 'listopada', 'studenoga', 'prosinca'];
+  function setMode(m) {
+    S.mode = m; save();
+    document.body.classList.toggle('mode-tt', m === 'tt');
+    $('#tt').classList.toggle('hidden', m !== 'tt');
+    document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+    if (m === 'tt') renderTT(true); else refresh();
+  }
+  function ttPicks() {
+    const seen = {}, out = [];
+    S.groups.forEach(g => g.items.forEach(it => {
+      const k = it.route + '|' + it.dir + '|' + it.stop;
+      if (!seen[k]) { seen[k] = 1; out.push(it); }
+    }));
+    return out;
+  }
+  function renderTTSel() {
+    const t = S.tt;
+    const picks = ttPicks().filter(it => !t || it.route !== t.route || it.dir !== t.dir || it.stop !== t.stop);
+    $('#ttSel').innerHTML = (t
+      ? '<div class="row">' + badge(t.route, t.bus) + '<div class="where"><span class="one"><span class="from">' + esc(t.stop) + ' →</span> <span class="to">' + esc(t.head) + '</span></span></div>' +
+        '<button class="btn ghost change" data-tt="pick">Promijeni</button></div>'
+      : '<div class="empty">Odaberi liniju, smjer i stanicu za koju želiš vidjeti red vožnje.<br><button class="btn" data-tt="pick">Odaberi liniju i stanicu</button></div>') +
+      (picks.length ? '<div class="tt-quick"><div class="label">Tvoje linije</div><div class="chips2">' + picks.map((it, i) =>
+        '<button class="qpick" data-ttq="' + i + '">' + badge(it.route, it.bus) + esc(it.stop) + ' → ' + esc(it.head) + '</button>').join('') + '</div></div>' : '');
+    renderTTSel.picks = picks;
+  }
+  let ttBusy = 0;
+  async function renderTT(scroll) {
+    renderTTSel();
+    const d = ttDay, today = new Date(); today.setHours(0, 0, 0, 0);
+    const rel = Math.round((d - today) / 864e5);
+    $('#ttDay').textContent = (rel === 0 ? 'Danas, ' : rel === 1 ? 'Sutra, ' : rel === -1 ? 'Jučer, ' : DANI[d.getDay()][0].toUpperCase() + DANI[d.getDay()].slice(1) + ', ') + d.getDate() + '. ' + MJ[d.getMonth()] + ' ' + d.getFullYear() + '.';
+    $('#ttDate').value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    const box = $('#ttList');
+    if (!S.tt) { box.innerHTML = ''; return; }
+    const my = ++ttBusy;
+    box.innerHTML = '<p class="note">Učitavam…</p>';
+    let f;
+    try { await loadBase(); f = await stopFile(S.tt.stop); } catch (e) { box.innerHTML = '<p class="note">Vozni red nije dostupan (' + esc(e.message) + ').</p>'; return; }
+    if (my !== ttBusy) return;
+    if (!f) { box.innerHTML = '<p class="note">Stanica „' + esc(S.tt.stop) + '” nije u trenutnom voznom redu.</p>'; return; }
+    const date8 = ymd(d), seenTrip = {}, list = [];
+    for (const t of f.t) {
+      if (t[1] !== S.tt.route || t[2] !== S.tt.dir || seenTrip[t[0]]) continue;
+      if (!svcOn(t[4], date8, d.getDay())) continue;
+      seenTrip[t[0]] = 1;
+      list.push({ sec: t[5], head: f.h[t[3]] });
+    }
+    list.sort((a, b) => a.sec - b.sec);
+    if (!list.length) {
+      const until = meta && meta.to ? meta.to.slice(6, 8) + '. ' + meta.to.slice(4, 6) + '. ' + meta.to.slice(0, 4) + '.' : '';
+      box.innerHTML = '<p class="note">Za ovaj dan nema planiranih polazaka linije ' + esc(S.tt.route) + ' s ove stanice u tom smjeru.' +
+        (meta && meta.to && date8 > meta.to ? ' Objavljeni vozni red vrijedi do ' + until : '') + '</p>';
+      return;
+    }
+    // Glavno odredište (ostala se označe ispod vremena)
+    const hc = {}; list.forEach(x => { hc[x.head] = (hc[x.head] || 0) + 1; });
+    const main = Object.keys(hc).sort((a, b) => hc[b] - hc[a])[0];
+    const nowSec = rel === 0 ? (Date.now() - today.getTime()) / 1000 : null;
+    let nextDone = false;
+    const hours = {};
+    list.forEach(x => { const h = Math.floor(x.sec / 3600); (hours[h] = hours[h] || []).push(x); });
+    const hm = s => pad(Math.floor(s / 3600) % 24) + ':' + pad(Math.floor(s / 60) % 60);
+    const rows = Object.keys(hours).map(Number).sort((a, b) => a - b).map(h =>
+      '<div class="tt-row"><div class="tt-h">' + pad(h % 24) + '</div><div class="tt-m">' + hours[h].map(x => {
+        let cls = '';
+        if (nowSec != null) { if (x.sec < nowSec - 30) cls = ' past'; else if (!nextDone) { cls = ' next'; nextDone = true; } }
+        return '<span class="tt-t' + cls + '">' + hm(x.sec) + (x.head !== main ? '<small>' + esc(x.head) + '</small>' : '') + '</span>';
+      }).join('') + '</div></div>').join('');
+    const others = Object.keys(hc).filter(k => k !== main);
+    box.innerHTML = '<p class="tt-sum">' + list.length + ' polazaka · prvi ' + hm(list[0].sec) + ' · zadnji ' + hm(list[list.length - 1].sec) + ' · smjer ' + esc(main) + '</p>' +
+      '<div class="tt-hours">' + rows + '</div>' +
+      '<p class="tt-legend">Vremena su planirani polasci sa stanice <b style="color:inherit">' + esc(S.tt.stop) + '</b> po ZET-ovom voznom redu' +
+      (others.length ? '; <b>narančasti natpis</b> = vožnja završava drugdje (' + others.map(esc).join(', ') + ')' : '') +
+      '. Kašnjenja uživo vidiš na kartici Polasci uživo.</p>';
+    if (scroll && nowSec != null) { const n = box.querySelector('.tt-t.next'); if (n) n.closest('.tt-row').scrollIntoView({ block: 'center' }); }
+  }
+  $('#ttDate').addEventListener('change', e => {
+    const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(e.target.value || '');
+    if (m) { ttDay = new Date(+m[1], +m[2] - 1, +m[3]); renderTT(true); }
+  });
+
   // ---------------- Uređivanje ----------------
   let view = null;
   function openSheet(v) { view = v; $('#sheet').classList.remove('hidden'); $('#banner').classList.add('hidden'); renderSheet(); }
-  function closeSheet() { $('#sheet').classList.add('hidden'); view = null; save(); renderTabs(); renderBanner(); draw(); loadRt().then(draw); }
+  function closeSheet() { $('#sheet').classList.add('hidden'); view = null; pickTT = false; save(); renderTabs(); renderBanner(); if (S.mode === 'tt') renderTT(true); else { draw(); loadRt().then(draw); } }
   function setTitle(t) { $('#sheetTitle').textContent = t; }
   const body = () => $('#sheetBody');
 
@@ -314,7 +401,7 @@
       return;
     }
     if (view.v === 'lines') {
-      setTitle('Dodaj liniju');
+      setTitle(pickTT ? 'Odaberi liniju' : 'Dodaj liniju');
       const tab = view.tab || 'tram';
       const seg = '<div class="seg">' + [['tram', 'Tramvaji'], ['bus', 'Autobusi'], ['stop', 'Po stanici']].map(x => '<button data-tab="' + x[0] + '" class="' + (tab === x[0] ? 'on' : '') + '">' + x[1] + '</button>').join('') + '</div>';
       if (tab === 'stop') {
@@ -408,7 +495,9 @@
       (x.d != null ? '<span class="dist">' + fmtDist(x.d) + '</span>' : '') + '</button>').join('') || '<p class="note" style="padding:12px">Nema takve stanice.</p>';
   }
 
+  let pickTT = false;      // odabir linije za karticu Red vožnje (umjesto dodavanja u grupu)
   function addItem(route, dir, stop, head, bus) {
+    if (pickTT) { S.tt = { route, dir, stop, head, bus: bus ? 1 : 0 }; save(); closeSheet(); return; }
     const g = group();
     if (g.items.some(x => x.route === route && x.dir === dir && x.stop === stop)) { toast('Već je u grupi'); }
     else { g.items.push({ route, dir, stop, head, bus: bus ? 1 : 0 }); save(); toast('Dodano: ' + route + ' ' + stop + ' → ' + head); }
@@ -442,6 +531,14 @@
   // ---------------- Događaji ----------------
   document.addEventListener('click', async e => {
     const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.mode) { setMode(t.dataset.mode); return; }
+    if (t.dataset.tt) {
+      const k = t.dataset.tt;
+      if (k === 'pick') { pickTT = true; openSheet({ v: 'lines', tab: S.tt && !S.tt.bus ? 'tram' : S.tt ? 'bus' : 'tram' }); pickTT = true; }
+      else if (k === 'prev' || k === 'next') { ttDay = new Date(ttDay.getFullYear(), ttDay.getMonth(), ttDay.getDate() + (k === 'next' ? 1 : -1)); renderTT(true); }
+      return;
+    }
+    if (t.dataset.ttq != null) { const it = renderTTSel.picks[+t.dataset.ttq]; if (it) { S.tt = { route: it.route, dir: it.dir, stop: it.stop, head: it.head, bus: it.bus }; save(); renderTT(true); } return; }
     if (t.dataset.g != null) { S.cur = +t.dataset.g; save(); renderTabs(); refresh(); return; }
     if (t.id === 'editBtn') { openSheet({ v: 'group' }); return; }
     if (t.id === 'newsBtn') { openSheet({ v: 'news' }); return; }
@@ -517,12 +614,13 @@
 
   // ---------------- Pokretanje ----------------
   renderTabs();
-  refresh();
+  setMode(S.mode);
   loadNews();
   setInterval(() => { if (!document.hidden) loadNews(); }, 60e3);
-  setInterval(() => { if (!document.hidden && !view) draw(); }, DRAW_EVERY);
-  setInterval(() => { if (!document.hidden && !view && group().items.length) loadRt().then(draw); }, RT_EVERY);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { loadNews(); if (!view) refresh(); } });
+  setInterval(() => { if (!document.hidden && !view && S.mode === 'live') draw(); }, DRAW_EVERY);
+  setInterval(() => { if (!document.hidden && !view && S.mode === 'tt') renderTT(false); }, 60e3);
+  setInterval(() => { if (!document.hidden && !view && S.mode === 'live' && group().items.length) loadRt().then(draw); }, RT_EVERY);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { loadNews(); if (!view) { if (S.mode === 'tt') renderTT(false); else refresh(); } } });
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
   // za testiranje

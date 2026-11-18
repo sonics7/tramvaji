@@ -15,14 +15,20 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="modebar">
+  <nav id="modes" class="modes">
+    <button data-mode="live">Polasci uživo</button>
+    <button data-mode="tt">Red vožnje</button>
+  </nav>
+  <button id="newsBtn" class="iconbtn hidden" aria-label="Obavijesti ZET-a">📢<span id="newsCount" class="count hidden"></span></button>
+</div>
 <header class="top">
   <nav id="tabs" class="tabs"></nav>
-  <button id="newsBtn" class="iconbtn hidden" aria-label="Obavijesti ZET-a">📢<span id="newsCount" class="count hidden"></span></button>
   <button id="editBtn" class="iconbtn" aria-label="Uredi">✎</button>
 </header>
 
 <main>
-  <section class="board">
+  <section id="liveBoard" class="board">
     <div class="board-head">
       <span class="brand">🚋 ZET</span>
       <span class="cap">MINUTA DO POLASKA</span>
@@ -30,6 +36,17 @@
     <div id="rows"></div>
   </section>
   <p id="status" class="status"></p>
+
+  <!-- Red vožnje za odabrani dan -->
+  <section id="tt" class="tt hidden">
+    <div id="ttSel" class="board tt-sel"></div>
+    <div class="tt-date">
+      <button class="iconbtn" data-tt="prev" aria-label="Prethodni dan">◀</button>
+      <label class="tt-day"><span id="ttDay"></span><small>dodirni za kalendar</small><input type="date" id="ttDate" aria-label="Datum"></label>
+      <button class="iconbtn" data-tt="next" aria-label="Sljedeći dan">▶</button>
+    </div>
+    <div id="ttList"></div>
+  </section>
 </main>
 
 <!-- Traka s obavijestima ZET-a -->
