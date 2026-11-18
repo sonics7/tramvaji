@@ -291,18 +291,25 @@
     }));
     return out;
   }
-  let ttOpen = false, ttEdit = false;   // otvoren detalj jedne linije / uređivanje favorita
+  let ttOpen = false, ttEdit = false, ttIdx = -1;   // otvoren detalj jedne linije / uređivanje favorita
   const sameIt = (x, y) => x.route === y.route && x.dir === y.dir && x.stop === y.stop;
   function renderTTSel() {
     const t = S.tt;
     $('#ttDateBar').classList.toggle('hidden', !ttOpen);
     if (ttOpen && t) {
-      $('#ttSel').innerHTML = '<button class="back" data-tt="list">‹ Favoriti</button>' +
-        '<div class="row">' + badge(t.route, t.bus) + '<div class="where"><span class="one"><span class="from">' + esc(t.stop) + ' →</span> <span class="to">' + esc(t.head) + '</span></span></div></div>';
+      const L = (lines || []).find(l => l.r === t.route), si = stopIdx[t.stop];
+      const dirs = L ? L.d.map((d, i) => {
+        const ok = d.s.indexOf(si) >= 0;
+        return '<button class="' + (d.d === t.dir ? 'on' : '') + (ok ? '' : ' off') + '" data-ttdir="' + i + '"' + (ok ? '' : ' title="Ne staje na ovoj stanici"') + '>→ ' + esc(d.h) + (ok ? '' : '<small>ne staje ovdje</small>') + '</button>';
+      }).join('') : '';
+      $('#ttHead').innerHTML = '<div class="tt-head"><button class="tt-back" data-tt="list" aria-label="Natrag na favorite">‹</button>' + badge(t.route, t.bus) + '<div class="seg tt-dirs">' + dirs + '</div></div>';
+      $('#ttHead').classList.remove('hidden');
+      $('#ttSel').innerHTML = '<div class="tt-stop">Stanica: <b>' + esc(t.stop) + '</b><button class="link" data-tt="list">‹ Favoriti</button></div>';
       return;
     }
+    $('#ttHead').classList.add('hidden');
     const favs = S.ttFav;
-    const picks = ttPicks().filter(it => !favs.some(f => sameIt(f, it)));
+    const picks = ttPicks().filter(it => !favs.some(f => f.route === it.route && f.stop === it.stop));
     $('#ttSel').innerHTML = '<div class="board-head"><span class="brand">⭐ FAVORITI</span>' +
       (favs.length ? '<button class="link" data-tt="edit">' + (ttEdit ? 'Gotovo' : 'Uredi') + '</button>' : '') + '</div>' +
       (favs.length ? favs.map((f, i) => ttEdit
@@ -337,6 +344,7 @@
   }
   let ttBusy = 0;
   async function renderTT(scroll) {
+    if (ttOpen && !lines) { try { await loadBase(); await getLines(); } catch (e) {} }
     renderTTSel();
     const d = ttDay, today = new Date(); today.setHours(0, 0, 0, 0);
     const rel = Math.round((d - today) / 864e5);
@@ -467,12 +475,12 @@
       return;
     }
     if (view.v === 'stops') {
-      const L = lines.find(l => l.r === view.line), D = L.d[view.di];
-      setTitle(L.r + ' → ' + D.h);
-      body().innerHTML = '<button class="back" data-act="toDir">‹ Smjer</button>' +
+      const L = lines.find(l => l.r === view.line), D = lineDir(L, view.di);
+      setTitle(view.di < 0 ? (L.bus ? 'Autobus ' : 'Tramvaj ') + L.r : L.r + ' → ' + D.h);
+      body().innerHTML = (view.di < 0 ? '<button class="back" data-act="toLines">‹ Linije</button>' : '<button class="back" data-act="toDir">‹ Smjer</button>') +
         '<input id="q" class="field" placeholder="Traži stanicu" value="' + esc(view.q2 || '') + '" autocomplete="off">' +
         '<button class="link" data-act="nearLine">📍 Označi najbližu</button>' +
-        '<p class="note">Odaberi stanicu na kojoj ulaziš:</p><div id="res" class="list"></div>';
+        '<p class="note">' + (view.di < 0 ? 'Odaberi stanicu (smjer biraš u redu vožnje):' : 'Odaberi stanicu na kojoj ulaziš:') + '</p><div id="res" class="list"></div>';
       const q = $('#q');
       const fill = () => {
         const v = norm(q.value);
@@ -503,6 +511,13 @@
     }
   }
 
+  // Za Red vožnje: stanice obaju smjerova u jednom popisu (smjer se bira kasnije)
+  function lineDir(L, di) {
+    if (di >= 0) return L.d[di];
+    const s = L.d[0] ? L.d[0].s.slice() : [];
+    L.d.slice(1).forEach(d => d.s.forEach(x => { if (s.indexOf(x) < 0) s.push(x); }));
+    return { d: -1, h: '', s };
+  }
   function fmtDist(m) { return m < 1000 ? Math.round(m / 10) * 10 + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km'; }
   function distM(a, b, c, d) {
     const R = 6371e3, r = Math.PI / 180, x = (d - b) * r * Math.cos((a + c) / 2 * r), y = (c - a) * r;
@@ -533,7 +548,7 @@
   function addItem(route, dir, stop, head, bus) {
     if (pickTT) {
       const it = { route, dir, stop, head, bus: bus ? 1 : 0 };
-      if (S.ttFav.some(f => sameIt(f, it))) toast('Već je među favoritima'); else { S.ttFav.push(it); toast('Dodano u favorite: ' + route + ' ' + stop); }
+      if (S.ttFav.some(f => f.route === it.route && f.stop === it.stop)) toast('Već je među favoritima'); else { S.ttFav.push(it); toast('Dodano u favorite: ' + route + ' ' + stop); }
       ttOpen = false; save(); closeSheet(); return;
     }
     const g = group();
@@ -580,8 +595,15 @@
     }
     if (t.dataset.ttf != null) {
       const f = S.ttFav[+t.dataset.ttf];
-      if (f) { S.tt = f; ttOpen = true; ttDay = new Date(); ttDay.setHours(0, 0, 0, 0); save(); window.scrollTo(0, 0); renderTT(true); }
+      if (f) { S.tt = f; ttIdx = +t.dataset.ttf; ttOpen = true; ttDay = new Date(); ttDay.setHours(0, 0, 0, 0); save(); window.scrollTo(0, 0); renderTT(true); }
       return;
+    }
+    if (t.dataset.ttdir != null) {
+      const L = (lines || []).find(l => l.r === S.tt.route), d = L && L.d[+t.dataset.ttdir];
+      if (!d || t.classList.contains('off')) { toast('Linija u tom smjeru ne staje na ovoj stanici'); return; }
+      const f = S.ttFav[ttIdx], upd = { route: S.tt.route, dir: d.d, stop: S.tt.stop, head: d.h, bus: S.tt.bus };
+      S.tt = upd; if (f && f.route === upd.route && f.stop === upd.stop) S.ttFav[ttIdx] = upd;   // favorit pamti zadnji smjer
+      save(); renderTT(true); return;
     }
     if (t.dataset.fup != null) { const i = +t.dataset.fup; if (i > 0) { S.ttFav.splice(i - 1, 0, S.ttFav.splice(i, 1)[0]); save(); renderTT(false); } return; }
     if (t.dataset.fdown != null) { const i = +t.dataset.fdown; if (i < S.ttFav.length - 1) { S.ttFav.splice(i + 1, 0, S.ttFav.splice(i, 1)[0]); save(); renderTT(false); } return; }
@@ -597,11 +619,12 @@
     if (t.dataset.down != null) { const i = +t.dataset.down; if (i < g.items.length - 1) { g.items.splice(i + 1, 0, g.items.splice(i, 1)[0]); save(); renderSheet(); } return; }
     if (t.dataset.del != null) { g.items.splice(+t.dataset.del, 1); save(); renderSheet(); return; }
     if (t.dataset.tab) { view = { v: 'lines', tab: t.dataset.tab }; renderSheet(); return; }
-    if (t.dataset.line) { view = { v: 'dir', line: t.dataset.line, tab: view.tab }; renderSheet(); return; }
+    if (t.dataset.line) { view = pickTT ? { v: 'stops', line: t.dataset.line, di: -1, tab: view.tab, q2: '', dist: null } : { v: 'dir', line: t.dataset.line, tab: view.tab }; renderSheet(); return; }
     if (t.dataset.dir != null) { view = Object.assign({}, view, { v: 'stops', di: +t.dataset.dir, q2: '', dist: null }); renderSheet(); return; }
     if (t.dataset.stop != null) {
-      const L = lines.find(l => l.r === view.line), D = L.d[view.di];
-      addItem(L.r, D.d, stops[+t.dataset.stop].n, D.h, L.bus); return;
+      const L = lines.find(l => l.r === view.line), si = +t.dataset.stop;
+      const D = view.di >= 0 ? L.d[view.di] : (L.d.find(d => d.s.indexOf(si) >= 0 && d.s.indexOf(si) < d.s.length) || L.d[0]);
+      addItem(L.r, D.d, stops[si].n, D.h, L.bus); return;
     }
     if (t.dataset.si != null) { view = { v: 'stopLines', si: +t.dataset.si, tab: 'stop', q: view.q, near: view.near }; renderSheet(); return; }
     if (t.dataset.addr != null) { addItem(t.dataset.addr, +t.dataset.adir, stops[view.si].n, t.dataset.ahead, t.dataset.abus === '1'); return; }
@@ -647,7 +670,7 @@
         try {
           toast('Tražim lokaciju…');
           const c = await locate();
-          const L = lines.find(l => l.r === view.line), D = L.d[view.di];
+          const L = lines.find(l => l.r === view.line), D = lineDir(L, view.di);
           view.dist = {}; let best = null;
           D.s.forEach(si => { const s = stops[si]; if (s.lat == null) return; const d = distM(c.latitude, c.longitude, s.lat, s.lon); view.dist[si] = d; if (!best || d < best.d) best = { si, d }; });
           view.q2 = ''; view.scrollTo = best && best.si; renderSheet();

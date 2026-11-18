@@ -186,3 +186,18 @@ body.mode-tt main { padding-top: 12px; }
 .chev { flex: none; color: var(--muted); font-size: 24px; margin-left: 2px; }
 .tt-sel .item { padding: 0; border: 0; }
 .tt-sel .btn.wide { margin: 10px 0; }
+
+/* Red vožnje: odabir smjera pored broja linije */
+.tt-head { display: flex; align-items: center; gap: 10px; padding: 6px 0 4px; }
+.tt-head .badge { flex: none; }
+.tt-dirs { flex: 1; margin: 0; }
+.tt-dirs button { font-size: 14px; padding: 9px 6px; line-height: 1.15; }
+.tt-dirs button.on { background: var(--accent); color: #0d1430; }
+.tt-dirs button.off { opacity: .45; }
+.tt-dirs button small { display: block; font-size: 10px; font-weight: 400; }
+.tt-stop { color: var(--muted); font-size: 14px; padding: 4px 0 10px; }
+.tt-stop b { color: var(--text); font-size: 17px; }
+.tt-sticky { position: sticky; top: 0; z-index: 4; background: var(--bg); padding: calc(6px + env(safe-area-inset-top)) 0 6px; margin: -6px 0 8px; }
+.tt-sticky .tt-head { background: var(--card); border: 1px solid #2c3a5e; border-radius: 16px; padding: 8px 10px; }
+.tt-back { flex: none; font-size: 28px; line-height: 1; color: var(--accent); padding: 0 4px 4px 0; }
+.tt-stop { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }

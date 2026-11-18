@@ -66,12 +66,13 @@ Supruga isto na svom A54 – njene grupe i linije su samo njene.
 - **＋ Dodaj liniju**:
   - *Tramvaji* / *Autobusi* → broj linije → smjer → stanica (📍 *Označi najbližu* pronađe stanicu po lokaciji), ili
   - *Po stanici* → upiši naziv ili 📍 *Najbliže stanice* → sve linije koje tamo staju.
-- **Red vožnje** (gornja kartica): popis **favorita** – linija (sa smjerom i stanicom) čiji red vožnje
-  često gledaš; uz svaku piše sljedeći planirani polazak danas. *＋ Dodaj liniju u favorite* ili brzo
-  iz svojih grupa; *Uredi* za redoslijed (▲▼) i brisanje (✕). Dodir na favorit otvara sve planirane
-  vožnje za odabrani dan (◀ ▶ ili dodir na datum za kalendar), po satima, s vremenom polaska s te
-  stanice. Danas: prošli polasci su blijedi, sljedeći je istaknut. Narančasti natpis ispod vremena =
-  vožnja završava drugdje (npr. u spremištu). *‹ Favoriti* vraća na popis.
+- **Red vožnje** (gornja kartica): popis **favorita** – linija i stanica čiji red vožnje često gledaš;
+  uz svaku piše sljedeći planirani polazak danas. *＋ Dodaj liniju u favorite*: odaberi liniju pa
+  stanicu (smjer ne treba), ili brzo iz svojih grupa; *Uredi* za redoslijed (▲▼) i brisanje (✕).
+  Dodir na favorit otvara red vožnje: pored broja linije su **oba smjera** (npr. → Sopot / → Črnomerec)
+  – dodirom biraš smjer, a ispod su sve planirane vožnje za odabrani dan (◀ ▶ ili dodir na datum za
+  kalendar), po satima. Favorit pamti zadnje odabrani smjer. Danas: prošli polasci su blijedi,
+  sljedeći je istaknut. Narančasti natpis ispod vremena = vožnja završava drugdje (npr. u spremištu).
 - Minute: veliki broj je prvi polazak, zatim sljedeća dva. „sada” = manje od minute; ako je
   polazak za više od sat vremena, piše se točno vrijeme (npr. 5:12).
 - **Prijenos na drugi mobitel:** *Kopiraj / pošalji kod* → pošalji poruku → na drugom mobitelu
