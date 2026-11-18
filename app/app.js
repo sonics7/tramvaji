@@ -298,9 +298,15 @@
     $('#ttDateBar').classList.toggle('hidden', !ttOpen);
     if (ttOpen && t) {
       const L = (lines || []).find(l => l.r === t.route), si = stopIdx[t.stop];
+      // smjer je dostupan ako linija u tom smjeru polazi s ove stanice (nije joj zadnja stanica)
+      const okDir = d => { const k = d.s.indexOf(si); return k >= 0 && k < d.s.length - 1; };
+      if (L && !L.d.some(d => d.d === t.dir && okDir(d))) {
+        const alt = L.d.find(okDir);
+        if (alt) { S.tt = Object.assign({}, t, { dir: alt.d, head: alt.h }); if (S.ttFav[ttIdx] && S.ttFav[ttIdx].route === t.route && S.ttFav[ttIdx].stop === t.stop) S.ttFav[ttIdx] = S.tt; save(); return renderTTSel(); }
+      }
       const dirs = L ? L.d.map((d, i) => {
-        const ok = d.s.indexOf(si) >= 0;
-        return '<button class="' + (d.d === t.dir ? 'on' : '') + (ok ? '' : ' off') + '" data-ttdir="' + i + '"' + (ok ? '' : ' title="Ne staje na ovoj stanici"') + '>→ ' + esc(d.h) + (ok ? '' : '<small>ne staje ovdje</small>') + '</button>';
+        const ok = okDir(d), last = d.s.indexOf(si) === d.s.length - 1;
+        return '<button class="' + (d.d === t.dir ? 'on' : '') + (ok ? '' : ' off') + '" data-ttdir="' + i + '">→ ' + esc(d.h) + (ok ? '' : '<small>' + (last ? 'ovdje završava' : 'ne staje ovdje') + '</small>') + '</button>';
       }).join('') : '';
       $('#ttHead').innerHTML = '<div class="tt-head"><button class="tt-back" data-tt="list" aria-label="Natrag na favorite">‹</button>' + badge(t.route, t.bus) + '<div class="seg tt-dirs">' + dirs + '</div></div>';
       $('#ttHead').classList.remove('hidden');
@@ -600,7 +606,7 @@
     }
     if (t.dataset.ttdir != null) {
       const L = (lines || []).find(l => l.r === S.tt.route), d = L && L.d[+t.dataset.ttdir];
-      if (!d || t.classList.contains('off')) { toast('Linija u tom smjeru ne staje na ovoj stanici'); return; }
+      if (!d || t.classList.contains('off')) { toast('U tom smjeru linija s ove stanice ne polazi'); return; }
       const f = S.ttFav[ttIdx], upd = { route: S.tt.route, dir: d.d, stop: S.tt.stop, head: d.h, bus: S.tt.bus };
       S.tt = upd; if (f && f.route === upd.route && f.stop === upd.stop) S.ttFav[ttIdx] = upd;   // favorit pamti zadnji smjer
       save(); renderTT(true); return;
@@ -623,7 +629,7 @@
     if (t.dataset.dir != null) { view = Object.assign({}, view, { v: 'stops', di: +t.dataset.dir, q2: '', dist: null }); renderSheet(); return; }
     if (t.dataset.stop != null) {
       const L = lines.find(l => l.r === view.line), si = +t.dataset.stop;
-      const D = view.di >= 0 ? L.d[view.di] : (L.d.find(d => d.s.indexOf(si) >= 0 && d.s.indexOf(si) < d.s.length) || L.d[0]);
+      const D = view.di >= 0 ? L.d[view.di] : (L.d.find(d => d.s.indexOf(si) >= 0 && d.s.indexOf(si) < d.s.length - 1) || L.d.find(d => d.s.indexOf(si) >= 0) || L.d[0]);
       addItem(L.r, D.d, stops[si].n, D.h, L.bus); return;
     }
     if (t.dataset.si != null) { view = { v: 'stopLines', si: +t.dataset.si, tab: 'stop', q: view.q, near: view.near }; renderSheet(); return; }
