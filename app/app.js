@@ -457,7 +457,7 @@
         (S.cur > 0 ? '<button class="btn ghost wide" data-act="gleft">◀ Pomakni grupu ulijevo</button>' : '') +
         (S.groups.length > 1 ? '<button class="btn danger wide" data-act="delgroup">Obriši grupu „' + esc(g.name) + '”</button>' : '') +
         '<div class="label">Prijenos na drugi mobitel</div>' +
-        '<p class="note">Postavke su spremljene samo na ovom mobitelu. Da ih preneseš (npr. supruzi kao početne), pošalji kod; ona ga zalijepi ispod i dalje uređuje svoje.</p>' +
+        '<p class="note">Postavke su spremljene samo na ovom mobitelu. Da ih preneseš na drugi mobitel (svoj ili nečiji), pošalji kod – na drugom mobitelu zalijepi ga ispod i dalje se uređuje neovisno.</p>' +
         '<button class="btn ghost wide" data-act="export">Kopiraj / pošalji kod</button>' +
         '<input id="importCode" class="field" style="margin-top:10px" placeholder="Zalijepi kod ovdje">' +
         '<button class="btn ghost wide" data-act="import">Uvezi grupe iz koda</button>' +
