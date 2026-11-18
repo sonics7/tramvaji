@@ -21,6 +21,7 @@
   }
   if (!(S.cur >= 0 && S.cur < S.groups.length)) S.cur = 0;
   if (S.mode !== 'tt') S.mode = 'live';
+  if (!Array.isArray(S.ttFav)) S.ttFav = S.tt ? [S.tt] : [];
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
   const group = () => S.groups[S.cur];
 
@@ -280,7 +281,7 @@
     document.body.classList.toggle('mode-tt', m === 'tt');
     $('#tt').classList.toggle('hidden', m !== 'tt');
     document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
-    if (m === 'tt') renderTT(true); else refresh();
+    if (m === 'tt') { ttOpen = false; ttEdit = false; renderTT(false); } else refresh();
   }
   function ttPicks() {
     const seen = {}, out = [];
@@ -290,16 +291,49 @@
     }));
     return out;
   }
+  let ttOpen = false, ttEdit = false;   // otvoren detalj jedne linije / uređivanje favorita
+  const sameIt = (x, y) => x.route === y.route && x.dir === y.dir && x.stop === y.stop;
   function renderTTSel() {
     const t = S.tt;
-    const picks = ttPicks().filter(it => !t || it.route !== t.route || it.dir !== t.dir || it.stop !== t.stop);
-    $('#ttSel').innerHTML = (t
-      ? '<div class="row">' + badge(t.route, t.bus) + '<div class="where"><span class="one"><span class="from">' + esc(t.stop) + ' →</span> <span class="to">' + esc(t.head) + '</span></span></div>' +
-        '<button class="btn ghost change" data-tt="pick">Promijeni</button></div>'
-      : '<div class="empty">Odaberi liniju, smjer i stanicu za koju želiš vidjeti red vožnje.<br><button class="btn" data-tt="pick">Odaberi liniju i stanicu</button></div>') +
-      (picks.length ? '<div class="tt-quick"><div class="label">Tvoje linije</div><div class="chips2">' + picks.map((it, i) =>
-        '<button class="qpick" data-ttq="' + i + '">' + badge(it.route, it.bus) + esc(it.stop) + ' → ' + esc(it.head) + '</button>').join('') + '</div></div>' : '');
+    $('#ttDateBar').classList.toggle('hidden', !ttOpen);
+    if (ttOpen && t) {
+      $('#ttSel').innerHTML = '<button class="back" data-tt="list">‹ Favoriti</button>' +
+        '<div class="row">' + badge(t.route, t.bus) + '<div class="where"><span class="one"><span class="from">' + esc(t.stop) + ' →</span> <span class="to">' + esc(t.head) + '</span></span></div></div>';
+      return;
+    }
+    const favs = S.ttFav;
+    const picks = ttPicks().filter(it => !favs.some(f => sameIt(f, it)));
+    $('#ttSel').innerHTML = '<div class="board-head"><span class="brand">⭐ FAVORITI</span>' +
+      (favs.length ? '<button class="link" data-tt="edit">' + (ttEdit ? 'Gotovo' : 'Uredi') + '</button>' : '') + '</div>' +
+      (favs.length ? favs.map((f, i) => ttEdit
+        ? '<div class="row">' + badge(f.route, f.bus) + '<div class="where"><span class="one"><span class="from">' + esc(f.stop) + ' →</span> <span class="to">' + esc(f.head) + '</span></span></div>' +
+          '<div class="item"><div class="ctl"><button data-fup="' + i + '" aria-label="Gore">▲</button><button data-fdown="' + i + '" aria-label="Dolje">▼</button><button class="x" data-fdel="' + i + '" aria-label="Ukloni">✕</button></div></div></div>'
+        : '<button class="row fav" data-ttf="' + i + '">' + badge(f.route, f.bus) + '<div class="where"><span class="one"><span class="from">' + esc(f.stop) + ' →</span> <span class="to">' + esc(f.head) + '</span></span></div>' +
+          '<span class="ttnext" id="ttn' + i + '"></span><span class="chev">›</span></button>').join('')
+        : '<div class="empty">Još nema favorita. Dodaj linije čiji red vožnje često gledaš.</div>') +
+      '<button class="btn wide" data-tt="pick">＋ Dodaj liniju u favorite</button>' +
+      (picks.length ? '<div class="tt-quick"><div class="label">Brzo dodaj iz svojih grupa</div><div class="chips2">' + picks.map((it, i) =>
+        '<button class="qpick" data-ttq="' + i + '">＋ ' + badge(it.route, it.bus) + esc(it.stop) + ' → ' + esc(it.head) + '</button>').join('') + '</div></div>' : '');
     renderTTSel.picks = picks;
+    if (!ttEdit) favNext();
+  }
+  // Sljedeći planirani polazak danas za svaki favorit
+  async function favNext() {
+    try { await loadBase(); } catch (e) { return; }
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    const date8 = ymd(d), nowSec = (Date.now() - d.getTime()) / 1000;
+    S.ttFav.forEach(async (f, i) => {
+      let fl; try { fl = await stopFile(f.stop); } catch (e) { return; }
+      const el = document.getElementById('ttn' + i); if (!el || !fl) return;
+      let best = null;
+      for (const t of fl.t) {
+        if (t[1] !== f.route || t[2] !== f.dir || t[5] < nowSec - 30) continue;
+        if (best != null && t[5] >= best) continue;
+        if (svcOn(t[4], date8, d.getDay())) best = t[5];
+      }
+      const hm = s => pad(Math.floor(s / 3600) % 24) + ':' + pad(Math.floor(s / 60) % 60);
+      el.innerHTML = best == null ? '<small>danas više</small>nema' : '<small>sljedeći</small>' + hm(best);
+    });
   }
   let ttBusy = 0;
   async function renderTT(scroll) {
@@ -309,7 +343,7 @@
     $('#ttDay').textContent = (rel === 0 ? 'Danas, ' : rel === 1 ? 'Sutra, ' : rel === -1 ? 'Jučer, ' : DANI[d.getDay()][0].toUpperCase() + DANI[d.getDay()].slice(1) + ', ') + d.getDate() + '. ' + MJ[d.getMonth()] + ' ' + d.getFullYear() + '.';
     $('#ttDate').value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     const box = $('#ttList');
-    if (!S.tt) { box.innerHTML = ''; return; }
+    if (!ttOpen || !S.tt) { box.innerHTML = ''; return; }
     const my = ++ttBusy;
     box.innerHTML = '<p class="note">Učitavam…</p>';
     let f;
@@ -497,7 +531,11 @@
 
   let pickTT = false;      // odabir linije za karticu Red vožnje (umjesto dodavanja u grupu)
   function addItem(route, dir, stop, head, bus) {
-    if (pickTT) { S.tt = { route, dir, stop, head, bus: bus ? 1 : 0 }; save(); closeSheet(); return; }
+    if (pickTT) {
+      const it = { route, dir, stop, head, bus: bus ? 1 : 0 };
+      if (S.ttFav.some(f => sameIt(f, it))) toast('Već je među favoritima'); else { S.ttFav.push(it); toast('Dodano u favorite: ' + route + ' ' + stop); }
+      ttOpen = false; save(); closeSheet(); return;
+    }
     const g = group();
     if (g.items.some(x => x.route === route && x.dir === dir && x.stop === stop)) { toast('Već je u grupi'); }
     else { g.items.push({ route, dir, stop, head, bus: bus ? 1 : 0 }); save(); toast('Dodano: ' + route + ' ' + stop + ' → ' + head); }
@@ -534,11 +572,21 @@
     if (t.dataset.mode) { setMode(t.dataset.mode); return; }
     if (t.dataset.tt) {
       const k = t.dataset.tt;
-      if (k === 'pick') { pickTT = true; openSheet({ v: 'lines', tab: S.tt && !S.tt.bus ? 'tram' : S.tt ? 'bus' : 'tram' }); pickTT = true; }
+      if (k === 'pick') { pickTT = true; openSheet({ v: 'lines', tab: 'tram' }); pickTT = true; }
+      else if (k === 'list') { ttOpen = false; renderTT(false); window.scrollTo(0, 0); }
+      else if (k === 'edit') { ttEdit = !ttEdit; renderTT(false); }
       else if (k === 'prev' || k === 'next') { ttDay = new Date(ttDay.getFullYear(), ttDay.getMonth(), ttDay.getDate() + (k === 'next' ? 1 : -1)); renderTT(true); }
       return;
     }
-    if (t.dataset.ttq != null) { const it = renderTTSel.picks[+t.dataset.ttq]; if (it) { S.tt = { route: it.route, dir: it.dir, stop: it.stop, head: it.head, bus: it.bus }; save(); renderTT(true); } return; }
+    if (t.dataset.ttf != null) {
+      const f = S.ttFav[+t.dataset.ttf];
+      if (f) { S.tt = f; ttOpen = true; ttDay = new Date(); ttDay.setHours(0, 0, 0, 0); save(); window.scrollTo(0, 0); renderTT(true); }
+      return;
+    }
+    if (t.dataset.fup != null) { const i = +t.dataset.fup; if (i > 0) { S.ttFav.splice(i - 1, 0, S.ttFav.splice(i, 1)[0]); save(); renderTT(false); } return; }
+    if (t.dataset.fdown != null) { const i = +t.dataset.fdown; if (i < S.ttFav.length - 1) { S.ttFav.splice(i + 1, 0, S.ttFav.splice(i, 1)[0]); save(); renderTT(false); } return; }
+    if (t.dataset.fdel != null) { S.ttFav.splice(+t.dataset.fdel, 1); if (!S.ttFav.length) ttEdit = false; save(); renderTT(false); return; }
+    if (t.dataset.ttq != null) { const it = renderTTSel.picks[+t.dataset.ttq]; if (it) { S.ttFav.push({ route: it.route, dir: it.dir, stop: it.stop, head: it.head, bus: it.bus }); save(); toast('Dodano u favorite'); renderTT(false); } return; }
     if (t.dataset.g != null) { S.cur = +t.dataset.g; save(); renderTabs(); refresh(); return; }
     if (t.id === 'editBtn') { openSheet({ v: 'group' }); return; }
     if (t.id === 'newsBtn') { openSheet({ v: 'news' }); return; }

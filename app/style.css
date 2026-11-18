@@ -109,7 +109,7 @@ main { padding: 8px 12px 24px; }
 .chip.bus { background: var(--bus); }
 .note { color: var(--muted); font-size: 13px; line-height: 1.45; }
 .back { color: var(--accent); font-weight: 600; margin-bottom: 10px; display: inline-block; }
-.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2b3a60; padding: 10px 16px; border-radius: 12px; z-index: 20; font-size: 14px; }
+.toast { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top)); transform: translateX(-50%); background: #2b3a60; padding: 10px 16px; border-radius: 12px; z-index: 20; font-size: 14px; }
 
 @media (max-width: 380px) {
   .where .to { font-size: 16px; }
@@ -175,3 +175,14 @@ body.mode-tt main { padding-top: 12px; }
 .tt-t.next small { color: #0d1430; }
 .tt-legend { color: var(--muted); font-size: 12px; margin: 10px 2px 0; line-height: 1.5; }
 .tt-legend b { color: #e8a33a; font-weight: 600; }
+
+/* Favoriti u Redu vožnje */
+.tt-sel .board-head { padding-bottom: 2px; }
+.row.fav { width: 100%; text-align: left; border-top: 1px solid var(--line); }
+.tt-sel .row:first-of-type { border-top: 0; }
+.row.fav:active { background: #2b3a60; }
+.ttnext { flex: none; text-align: right; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.ttnext small { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
+.chev { flex: none; color: var(--muted); font-size: 24px; margin-left: 2px; }
+.tt-sel .item { padding: 0; border: 0; }
+.tt-sel .btn.wide { margin: 10px 0; }
