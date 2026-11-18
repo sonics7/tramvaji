@@ -113,14 +113,14 @@ async function getZip() {
   });
 
   // Stanice (ime je ključ: više perona istog imena = jedna stanica)
-  const stopName = {}, stopPos = {};
+  const stopName = {}, stopPos = {}, stopLL = {};
   csv(f['stops.txt'], o => {
     if (o.location_type && o.location_type !== '0') return;
     const n = (o.stop_name || '').trim();
     if (!n) return;
     stopName[o.stop_id] = n;
     const lat = parseFloat(o.stop_lat), lon = parseFloat(o.stop_lon);
-    if (!isNaN(lat) && !isNaN(lon)) (stopPos[n] = stopPos[n] || []).push([lat, lon]);
+    if (!isNaN(lat) && !isNaN(lon)) stopLL[o.stop_id] = [lat, lon];
   });
 
   // Usluge (dani vožnje)
@@ -148,10 +148,42 @@ async function getZip() {
     const tr = trips[o.trip_id]; if (!tr) return;
     const n = stopName[o.stop_id]; if (!n) return;
     const sec = toSec(o.departure_time) ?? toSec(o.arrival_time); if (sec == null) return;
-    tr.st.push([+o.stop_sequence, n, sec]);
+    tr.st.push([+o.stop_sequence, n, sec, o.stop_id]);
     rows++;
   });
   console.log('Učitano: ' + Object.keys(routes).length + ' linija, ' + Object.keys(trips).length + ' vožnji, ' + rows + ' zaustavljanja');
+
+  // Više zasebnih stanica istog imena zaredom (npr. Zapruđe kod Mosta mladosti i Zapruđe prema Utrini):
+  // svaka dobije ime po susjednoj stanici, npr. „Zapruđe (Most mladosti)” i „Zapruđe (Utrina)”.
+  const votes = {};              // stop_id -> {oznaka: broj}
+  for (const id in trips) {
+    const st = trips[id].st;
+    if (st.length < 2) continue;
+    st.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < st.length;) {
+      let j = i; while (j + 1 < st.length && st[j + 1][1] === st[i][1]) j++;
+      if (j > i) {
+        const run = st.slice(i, j + 1), L = run.length, used = {};
+        run.forEach((x, k) => {
+          if (x[3] === (run[k - 1] || [])[3]) return;          // isti stop_id dvaput – nije nova stanica
+          let lab = k === 0 && i > 0 ? st[i - 1][1] : k === L - 1 && j + 1 < st.length ? st[j + 1][1] : null;
+          if (!lab || used[lab]) lab = '#' + (k + 1);
+          used[lab] = 1;
+          const v = (votes[x[3]] = votes[x[3]] || {}); v[lab] = (v[lab] || 0) + 1;
+        });
+      }
+      i = j + 1;
+    }
+  }
+  let renamed = 0;
+  for (const sid in votes) {
+    const v = votes[sid], lab = Object.keys(v).sort((a, b) => v[b] - v[a])[0];
+    stopName[sid] = stopName[sid] + (lab[0] === '#' ? ' (' + lab.slice(1) + ')' : ' (' + lab + ')');
+    renamed++;
+  }
+  for (const id in trips) trips[id].st.forEach(x => { x[1] = stopName[x[3]]; });
+  for (const sid in stopLL) { const n = stopName[sid]; if (n) (stopPos[n] = stopPos[n] || []).push(stopLL[sid]); }
+  if (renamed) console.log('Zasebne stanice istog imena zaredom: ' + renamed + ' perona dobilo oznaku susjedne stanice');
 
   // Po stanici: polasci (bez zadnje stanice vožnje = samo dolazak)
   const perStop = {};            // ime -> [[trip, route_short, dir, head, svcIdx, sec, seq]]
@@ -161,8 +193,8 @@ async function getZip() {
     const tr = trips[id];
     if (!tr.st.length) continue;
     tr.st.sort((a, b) => a[0] - b[0]);
-    // isti naziv stanice dvaput zaredom (dolazni i odlazni peron) -> ostaje samo odlazak
-    tr.st = tr.st.filter((x, i) => !(tr.st[i + 1] && tr.st[i + 1][1] === x[1]));
+    // isti peron dvaput zaredom (dolazak i odlazak upisani posebno) -> ostaje samo odlazak
+    tr.st = tr.st.filter((x, i) => !(tr.st[i + 1] && tr.st[i + 1][3] === x[3]));
     const rs = routes[tr.r].s, last = tr.st.length - 1;
     const head = tr.h || tr.st[last][1];
     tr.st.forEach((x, i) => {
