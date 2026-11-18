@@ -161,6 +161,8 @@ async function getZip() {
     const tr = trips[id];
     if (!tr.st.length) continue;
     tr.st.sort((a, b) => a[0] - b[0]);
+    // isti naziv stanice dvaput zaredom (dolazni i odlazni peron) -> ostaje samo odlazak
+    tr.st = tr.st.filter((x, i) => !(tr.st[i + 1] && tr.st[i + 1][1] === x[1]));
     const rs = routes[tr.r].s, last = tr.st.length - 1;
     const head = tr.h || tr.st[last][1];
     tr.st.forEach((x, i) => {
@@ -185,12 +187,17 @@ async function getZip() {
     const [rid, d] = k.split('|');
     const vars = Object.values(patterns[k]).sort((a, b) => b.n - a.n);
     const seq = vars[0].stops.slice();
+    // Dodaj stanice iz čestih varijanti (obilasci, produžeci); rijetke vožnje (npr. iz spremišta) preskoči
     for (const v of vars.slice(1)) {
+      if (v.n < vars[0].n * 0.15) continue;
       v.stops.forEach((n, i) => {
         if (seq.indexOf(n) >= 0) return;
         let at = -1;
         for (let j = i - 1; j >= 0 && at < 0; j--) at = seq.indexOf(v.stops[j]);
-        seq.splice(at + 1, 0, n);
+        if (at >= 0) { seq.splice(at + 1, 0, n); return; }
+        let nx = -1;
+        for (let j = i + 1; j < v.stops.length && nx < 0; j++) nx = seq.indexOf(v.stops[j]);
+        if (nx >= 0) seq.splice(nx, 0, n);
       });
     }
     const R = routes[rid];

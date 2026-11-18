@@ -149,7 +149,9 @@
           isLive = true;
         }
         if (at < now - 20e3) continue;
-        list.push({ at, sched, live: isLive, head: file.h[t[3]] });
+        const key = t[0] + '@' + d.getTime();
+        if (list.some(x => x.key === key)) continue;      // ista vožnja dvaput na istoj stanici
+        list.push({ key, at, sched, live: isLive, head: file.h[t[3]] });
       }
     }
     list.sort((a, b) => a.at - b.at);
