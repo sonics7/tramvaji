@@ -430,8 +430,7 @@
         '<div class="cal-nav"><button class="iconbtn" data-calm="-1" aria-label="Prethodni mjesec">◀</button><b>' + MJN[m] + ' ' + y + '.</b><button class="iconbtn" data-calm="1" aria-label="Sljedeći mjesec">▶</button></div>' +
         '<div class="cal-grid cal-wd">' + ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned'].map((w, k) => '<span' + (k >= 5 ? ' class="we"' : '') + '>' + w + '</span>').join('') + '</div>' +
         '<div class="cal-grid">' + cells + '</div>' +
-        '<div class="cal-quick"><button class="btn ghost" data-calq="0">Danas</button><button class="btn ghost" data-calq="1">Sutra</button></div>' +
-        (to ? '<p class="note">Objavljeni vozni red vrijedi do ' + to.slice(6, 8) + '. ' + to.slice(4, 6) + '. ' + to.slice(0, 4) + '.</p>' : '') + '</div>';
+        '<div class="cal-quick"><button class="btn ghost" data-calq="0">Danas</button><button class="btn ghost" data-calq="1">Sutra</button></div></div>';
       return;
     }
     if (view.v === 'news') {
