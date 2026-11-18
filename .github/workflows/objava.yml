@@ -1,0 +1,49 @@
+name: Objava (vozni red + aplikacija)
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '20 1 * * *'     # svaku noć oko 2:20 po našem vremenu
+  workflow_dispatch:          # ručno: Actions -> Objava -> Run workflow
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Ikone
+        run: |
+          pip install --quiet pillow
+          python3 build/make-icons.py app/icons
+      - name: Vozni red sa zet.hr
+        run: node build/build-data.js app/data
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
