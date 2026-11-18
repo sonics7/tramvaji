@@ -355,7 +355,6 @@
     const d = ttDay, today = new Date(); today.setHours(0, 0, 0, 0);
     const rel = Math.round((d - today) / 864e5);
     $('#ttDay').textContent = (rel === 0 ? 'Danas, ' : rel === 1 ? 'Sutra, ' : rel === -1 ? 'Jučer, ' : DANI[d.getDay()][0].toUpperCase() + DANI[d.getDay()].slice(1) + ', ') + d.getDate() + '. ' + MJ[d.getMonth()] + ' ' + d.getFullYear() + '.';
-    $('#ttDate').value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     const box = $('#ttList');
     if (!ttOpen || !S.tt) { box.innerHTML = ''; return; }
     const my = ++ttBusy;
@@ -400,14 +399,10 @@
       '. Kašnjenja uživo vidiš na kartici Polasci uživo.</p>';
     if (scroll && nowSec != null) { const n = box.querySelector('.tt-t.next'); if (n) n.closest('.tt-row').scrollIntoView({ block: 'center' }); }
   }
-  $('#ttDate').addEventListener('change', e => {
-    const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(e.target.value || '');
-    if (m) { ttDay = new Date(+m[1], +m[2] - 1, +m[3]); renderTT(true); }
-  });
 
   // ---------------- Uređivanje ----------------
   let view = null;
-  function openSheet(v) { view = v; $('#sheet').classList.remove('hidden'); $('#banner').classList.add('hidden'); renderSheet(); }
+  function openSheet(v) { view = v; $('#sheet').classList.remove('hidden'); $('#sheet').classList.toggle('compact', v.v === 'cal'); $('#banner').classList.add('hidden'); renderSheet(); }
   function closeSheet() { $('#sheet').classList.add('hidden'); view = null; pickTT = false; save(); renderTabs(); renderBanner(); if (S.mode === 'tt') renderTT(true); else { draw(); loadRt().then(draw); } }
   function setTitle(t) { $('#sheetTitle').textContent = t; }
   const body = () => $('#sheetBody');
@@ -415,6 +410,30 @@
   function renderSheet() {
     if (!view) return;
     const g = group();
+    if (view.v === 'cal') {
+      // Vlastiti kalendar: hrvatski nazivi, tjedan od ponedjeljka
+      setTitle('Odaberi datum');
+      const MJN = ['Siječanj', 'Veljača', 'Ožujak', 'Travanj', 'Svibanj', 'Lipanj', 'Srpanj', 'Kolovoz', 'Rujan', 'Listopad', 'Studeni', 'Prosinac'];
+      const y = view.y, m = view.m, first = new Date(y, m, 1), days = new Date(y, m + 1, 0).getDate();
+      const off = (first.getDay() + 6) % 7;            // ponedjeljak = 0
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const from = meta && meta.from, to = meta && meta.to;
+      let cells = '';
+      for (let k = 0; k < off; k++) cells += '<span></span>';
+      for (let dd = 1; dd <= days; dd++) {
+        const dt = new Date(y, m, dd), d8 = ymd(dt), wd = (dt.getDay() + 6) % 7;
+        const cls = (dt.getTime() === ttDay.getTime() ? ' sel' : '') + (dt.getTime() === today.getTime() ? ' today' : '') + (wd >= 5 ? ' we' : '');
+        const out = (from && d8 < from) || (to && d8 > to);
+        cells += '<button class="cal-d' + cls + '"' + (out ? ' disabled' : '') + ' data-cal="' + y + '-' + (m + 1) + '-' + dd + '">' + dd + '</button>';
+      }
+      body().innerHTML = '<div class="cal">' +
+        '<div class="cal-nav"><button class="iconbtn" data-calm="-1" aria-label="Prethodni mjesec">◀</button><b>' + MJN[m] + ' ' + y + '.</b><button class="iconbtn" data-calm="1" aria-label="Sljedeći mjesec">▶</button></div>' +
+        '<div class="cal-grid cal-wd">' + ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned'].map((w, k) => '<span' + (k >= 5 ? ' class="we"' : '') + '>' + w + '</span>').join('') + '</div>' +
+        '<div class="cal-grid">' + cells + '</div>' +
+        '<div class="cal-quick"><button class="btn ghost" data-calq="0">Danas</button><button class="btn ghost" data-calq="1">Sutra</button></div>' +
+        (to ? '<p class="note">Objavljeni vozni red vrijedi do ' + to.slice(6, 8) + '. ' + to.slice(4, 6) + '. ' + to.slice(0, 4) + '.</p>' : '') + '</div>';
+      return;
+    }
     if (view.v === 'news') {
       setTitle('Obavijesti ZET-a');
       classify();
@@ -593,6 +612,7 @@
     if (t.dataset.mode) { setMode(t.dataset.mode); return; }
     if (t.dataset.tt) {
       const k = t.dataset.tt;
+      if (k === 'cal') { openSheet({ v: 'cal', y: ttDay.getFullYear(), m: ttDay.getMonth() }); return; }
       if (k === 'pick') { pickTT = true; openSheet({ v: 'lines', tab: 'tram' }); pickTT = true; }
       else if (k === 'list') { ttOpen = false; renderTT(false); window.scrollTo(0, 0); }
       else if (k === 'edit') { ttEdit = !ttEdit; renderTT(false); }
@@ -603,6 +623,12 @@
       const f = S.ttFav[+t.dataset.ttf];
       if (f) { S.tt = f; ttIdx = +t.dataset.ttf; ttOpen = true; ttDay = new Date(); ttDay.setHours(0, 0, 0, 0); save(); window.scrollTo(0, 0); renderTT(true); }
       return;
+    }
+    if (t.dataset.calm != null) { const d = new Date(view.y, view.m + +t.dataset.calm, 1); view.y = d.getFullYear(); view.m = d.getMonth(); renderSheet(); return; }
+    if (t.dataset.cal != null || t.dataset.calq != null) {
+      if (t.dataset.cal != null) { const p = t.dataset.cal.split('-').map(Number); ttDay = new Date(p[0], p[1] - 1, p[2]); }
+      else { ttDay = new Date(); ttDay.setHours(0, 0, 0, 0); ttDay.setDate(ttDay.getDate() + +t.dataset.calq); }
+      closeSheet(); return;
     }
     if (t.dataset.ttdir != null) {
       const L = (lines || []).find(l => l.r === S.tt.route), d = L && L.d[+t.dataset.ttdir];
