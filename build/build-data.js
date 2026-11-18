@@ -166,6 +166,7 @@ async function getZip() {
         const run = st.slice(i, j + 1), L = run.length, used = {};
         run.forEach((x, k) => {
           if (x[3] === (run[k - 1] || [])[3]) return;          // isti stop_id dvaput – nije nova stanica
+          if (i + k === 0 || i + k === st.length - 1) return;   // početna/krajnja stanica (okretište) zadržava ime
           let lab = k === 0 && i > 0 ? st[i - 1][1] : k === L - 1 && j + 1 < st.length ? st[j + 1][1] : null;
           if (!lab || used[lab]) lab = '#' + (k + 1);
           used[lab] = 1;
