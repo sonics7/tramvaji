@@ -1,5 +1,5 @@
 // Service worker: aplikacija radi i bez mreže (vozni red iz zadnjeg dohvata).
-const APP = 'tramvaji-app-v11';
+const APP = 'tramvaji-app-v12';
 const DATA = 'tramvaji-data';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-180.png'];
 

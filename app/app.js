@@ -368,7 +368,7 @@
       if (t[1] !== S.tt.route || t[2] !== S.tt.dir || seenTrip[t[0]]) continue;
       if (!svcOn(t[4], date8, d.getDay())) continue;
       seenTrip[t[0]] = 1;
-      list.push({ sec: t[5], head: f.h[t[3]] });
+      list.push({ sec: t[5], head: f.h[t[3]], id: t[0] });
     }
     list.sort((a, b) => a.sec - b.sec);
     if (!list.length) {
@@ -389,20 +389,80 @@
       '<div class="tt-row"><div class="tt-h">' + pad(h % 24) + '</div><div class="tt-m">' + hours[h].map(x => {
         let cls = '';
         if (nowSec != null) { if (x.sec < nowSec - 30) cls = ' past'; else if (!nextDone) { cls = ' next'; nextDone = true; } }
-        return '<span class="tt-t' + cls + '">' + hm(x.sec) + (x.head !== main ? '<small>' + esc(x.head) + '</small>' : '') + '</span>';
+        return '<button class="tt-t' + cls + '" data-trip="' + esc(x.id) + '">' + hm(x.sec) + (x.head !== main ? '<small>' + esc(x.head) + '</small>' : '') + '</button>';
       }).join('') + '</div></div>').join('');
     const others = Object.keys(hc).filter(k => k !== main);
     box.innerHTML = '<p class="tt-sum">' + list.length + ' polazaka · prvi ' + hm(list[0].sec) + ' · zadnji ' + hm(list[list.length - 1].sec) + ' · smjer ' + esc(main) + '</p>' +
       '<div class="tt-hours">' + rows + '</div>' +
       '<p class="tt-legend">Vremena su planirani polasci sa stanice <b style="color:inherit">' + esc(S.tt.stop) + '</b> po ZET-ovom voznom redu' +
       (others.length ? '; <b>narančasti natpis</b> = vožnja završava drugdje (' + others.map(esc).join(', ') + ')' : '') +
-      '. Kašnjenja uživo vidiš na kartici Polasci uživo.</p>';
+      '. Dodirni vrijeme za cijelu vožnju sa svim stanicama.</p>';
     if (scroll && nowSec != null) { const n = box.querySelector('.tt-t.next'); if (n) n.closest('.tt-row').scrollIntoView({ block: 'center' }); }
+  }
+
+  // ---------------- Cijela vožnja (sve stanice i vremena) ----------------
+  const routeFiles = {};
+  const routeFile = r => String(r).replace(/[^A-Za-z0-9]/g, '_');
+  function getRoute(r) {
+    if (!routeFiles[r]) routeFiles[r] = getJson('r/' + routeFile(r) + '.json').catch(e => { delete routeFiles[r]; throw e; });
+    return routeFiles[r];
+  }
+  async function renderTrip() {
+    const v = view, L = (lines || []).find(l => l.r === v.route) || {};
+    setTitle((L.bus ? 'Autobus ' : 'Tramvaj ') + v.route);
+    body().innerHTML = '<p class="note">Učitavam vožnju…</p>';
+    let R;
+    try { R = await getRoute(v.route); } catch (e) { body().innerHTML = '<p class="note">Podaci o vožnji nisu dostupni (' + esc(e.message) + ').</p>'; return; }
+    if (view !== v) return;
+    const T = R.t[v.trip];
+    if (!T) { body().innerHTML = '<p class="note">Ova vožnja nije u voznom redu.</p>'; return; }
+    const pat = R.p[T[0]], prof = R.f[T[1]], t0 = T[2], head = R.h[T[4]];
+    setTitle(v.route + ' → ' + head);
+    const day = v.day, today = new Date(); today.setHours(0, 0, 0, 0);
+    const isToday = day.getTime() === today.getTime();
+    if (isToday && Date.now() - rt.at > 60e3) { await loadRt(); if (view !== v) return; }
+    const at = sec => new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, sec).getTime();
+    // Uživo (samo danas): kašnjenje po stanicama kao u Polascima uživo
+    const r = isToday && Date.now() - rt.at < 3 * 60e3 && rt.trips[v.trip];
+    const rows = pat[0].map((ni, k) => {
+      const sched = at(t0 + prof[k]), seq = pat[1][k];
+      let est = null;
+      if (r && !r.canceled) {
+        const exact = r.upd.find(u => u.seq === seq);
+        let best = null; r.upd.forEach(u => { if (u.seq != null && u.seq <= seq && u.delay != null) best = u; });
+        if (exact && exact.time) est = exact.time * 1000;
+        else if (best) est = sched + best.delay * 1000;
+        else if (r.upd[0] && r.upd[0].seq == null && r.upd[0].delay > 0) est = sched + r.upd[0].delay * 1000;
+      }
+      return { name: R.n[ni], sched, est };
+    });
+    const hm = ms => { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+    const now = Date.now(), first = rows[0], last = rows[rows.length - 1];
+    const mins = Math.round((last.sched - first.sched) / 60e3);
+    const dayTxt = isToday ? 'danas' : DANI[day.getDay()] + ', ' + day.getDate() + '. ' + MJ[day.getMonth()];
+    let passed = -1;
+    rows.forEach((x, k) => { if (isToday && (x.est || x.sched) < now - 20e3) passed = k; });
+    body().innerHTML =
+      '<div class="trip-sum">' + badge(v.route, L.bus) + '<div><b>' + esc(first.name) + ' → ' + esc(head) + '</b><small>' + esc(dayTxt) + ' · ' + rows.length + ' stanica · ' + mins + ' min vožnje' +
+      (r ? ' · <span class="live-txt">● uživo</span>' : '') + '</small></div></div>' +
+      '<div class="trip">' + rows.map((x, k) => {
+        const sel = x.name === v.stop ? ' sel' : '', past = k <= passed ? ' past' : '', cur = k === passed && k < rows.length - 1 ? ' cur' : '';
+        const d = x.est != null ? Math.round((x.est - x.sched) / 60e3) : 0;
+        const time = x.est != null && d !== 0
+          ? '<s>' + hm(x.sched) + '</s><b>' + hm(x.est) + '</b>'
+          : '<b>' + hm(x.sched) + '</b>';
+        return '<div class="tr' + sel + past + cur + (k === 0 ? ' first' : '') + (k === rows.length - 1 ? ' last' : '') + '">' +
+          '<span class="tm">' + time + '</span><span class="ln"><i></i></span><span class="nm">' + esc(x.name) +
+          (d ? '<em class="' + (d > 0 ? 'late' : 'early') + '">' + (d > 0 ? '+' : '−') + Math.abs(d) + ' min</em>' : '') + '</span></div>';
+      }).join('') + '</div>' +
+      '<p class="note">' + (r ? 'Precrtano je vrijeme po voznom redu, podebljano procjena uživo.' : 'Vremena su planirana po voznom redu.') + ' Istaknuta je tvoja stanica.</p>';
+    const s = body().querySelector('.tr.sel') || body().querySelector('.tr.cur');
+    if (s) s.scrollIntoView({ block: 'center' });
   }
 
   // ---------------- Uređivanje ----------------
   let view = null;
-  function openSheet(v) { view = v; $('#sheet').classList.remove('hidden'); $('#sheet').classList.toggle('compact', v.v === 'cal'); $('#banner').classList.add('hidden'); renderSheet(); }
+  function openSheet(v) { view = v; $('#sheet').classList.remove('hidden'); $('#sheet').classList.toggle('compact', v.v === 'cal'); $('#sheet').classList.toggle('tall', v.v === 'map'); $('#banner').classList.add('hidden'); renderSheet(); }
   function closeSheet() { $('#sheet').classList.add('hidden'); view = null; pickTT = false; save(); renderTabs(); renderBanner(); if (S.mode === 'tt') renderTT(true); else { draw(); loadRt().then(draw); } }
   function setTitle(t) { $('#sheetTitle').textContent = t; }
   const body = () => $('#sheetBody');
@@ -410,6 +470,15 @@
   function renderSheet() {
     if (!view) return;
     const g = group();
+    body().classList.toggle('flush', view.v === 'map');
+    if (view.v === 'map') {
+      setTitle('Vozila uživo');
+      if (!body().querySelector('iframe')) body().innerHTML =
+        '<div class="mapwrap"><iframe src="https://zet.skoljka.org/" title="Karta vozila ZET-a uživo" allow="geolocation" loading="lazy"></iframe></div>' +
+        '<div class="mapnote">Karta: zet.skoljka.org (neslužbena aplikacija) · <a href="https://zet.skoljka.org/" target="_blank" rel="noopener">Otvori zasebno ↗</a></div>';
+      return;
+    }
+    if (view.v === 'trip') { renderTrip(); return; }
     if (view.v === 'cal') {
       // Vlastiti kalendar: hrvatski nazivi, tjedan od ponedjeljka
       setTitle('Odaberi datum');
@@ -437,7 +506,9 @@
       setTitle('Obavijesti ZET-a');
       classify();
       const rel = news.filter(n => n.relevant), other = news.filter(n => !n.relevant);
-      body().innerHTML = (rel.length ? rel.map(n => newsCard(n, true)).join('') : '<p class="note">Trenutno nema izvanrednih obavijesti ni izmjena na tvojim linijama.</p>') +
+      const unreadAll = news.filter(n => seen.indexOf(n.id) < 0).length;
+      body().innerHTML = (unreadAll ? '<button class="btn wide readall" data-act="readall">✓ Označi sve kao pročitano</button>' : '<p class="note readok">✓ Sve obavijesti su pročitane.</p>') +
+        (rel.length ? rel.map(n => newsCard(n, true)).join('') : '<p class="note">Trenutno nema izvanrednih obavijesti ni izmjena na tvojim linijama.</p>') +
         (other.length ? '<div class="label">Ostale izmjene u prometu</div>' + other.map(n => newsCard(n, false)).join('') : '') +
         '<p class="note">Izvor: zet.hr (izvanredna obavijest s naslovnice i „Izmjene u prometu”). Osvježava se svakih 5 minuta.</p>';
       return;
@@ -643,6 +714,8 @@
     if (t.dataset.g != null) { S.cur = +t.dataset.g; save(); renderTabs(); refresh(); return; }
     if (t.id === 'editBtn') { openSheet({ v: 'group' }); return; }
     if (t.id === 'newsBtn') { openSheet({ v: 'news' }); return; }
+    if (t.id === 'mapBtn') { openSheet({ v: 'map' }); return; }
+    if (t.dataset.trip) { openSheet({ v: 'trip', trip: t.dataset.trip, route: S.tt.route, stop: S.tt.stop, day: new Date(ttDay.getTime()) }); return; }
     if (t.id === 'bClose') { e.stopPropagation(); markRead(news.filter(n => n.relevant)); renderBanner(); return; }
     if (t.hasAttribute('data-close')) { closeSheet(); return; }
     const g = group(), a = t.dataset.act;
@@ -665,6 +738,7 @@
         break;
       case 'toLines': view = { v: 'lines', tab: view.tab || 'tram', q: view.q, near: view.near }; renderSheet(); break;
       case 'toDir': view = { v: 'dir', line: view.line, tab: view.tab }; renderSheet(); break;
+      case 'readall': markRead(news); renderBanner(); renderSheet(); break;
       case 'newgroup': {
         const name = (prompt('Naziv nove grupe (npr. Posao, Škola):') || '').trim();
         if (!name) break;

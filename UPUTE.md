@@ -73,6 +73,13 @@ Supruga isto na svom A54 – njene grupe i linije su samo njene.
   – dodirom biraš smjer, a ispod su sve planirane vožnje za odabrani dan (◀ ▶ ili dodir na datum za
   kalendar), po satima. Favorit pamti zadnje odabrani smjer. Danas: prošli polasci su blijedi,
   sljedeći je istaknut. Narančasti natpis ispod vremena = vožnja završava drugdje (npr. u spremištu).
+  **Dodir na vrijeme** otvara cijelu tu vožnju: sve stanice od polazne do zadnje s vremenom prolaska,
+  tvoja stanica je istaknuta. Danas su prođene stanice blijede, a ako je vozilo u podacima uživo,
+  uz vremena piše kašnjenje (+3 min) i procijenjeno vrijeme.
+- **🗺️** (gore) – karta svih vozila uživo (zet.skoljka.org, neslužbena stranica) unutar aplikacije;
+  *Otvori zasebno ↗* ako želiš punu stranicu.
+- **📢** – obavijesti ZET-a; *✓ Označi sve kao pročitano* miče broj s ikone i traku pri dnu.
+- **✓ Gotovo** (gore desno u svakom prozoru) zatvara prozor i sprema promjene.
 - Minute: veliki broj je prvi polazak, zatim sljedeća dva. „sada” = manje od minute; ako je
   polazak za više od sat vremena, piše se točno vrijeme (npr. 5:12).
 - **Prijenos na drugi mobitel:** *Kopiraj / pošalji kod* → pošalji poruku → na drugom mobitelu

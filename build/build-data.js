@@ -70,6 +70,7 @@ function csv(buf, each) {
   }
 }
 const toSec = t => { const m = /^(\d+):(\d\d):(\d\d)$/.exec(t || ''); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; };
+const routeFile = r => String(r).replace(/[^A-Za-z0-9]/g, '_');
 const numSort = (a, b) => (parseInt(a, 10) || 9999) - (parseInt(b, 10) || 9999) || String(a).localeCompare(String(b));
 
 async function getZip() {
@@ -210,6 +211,23 @@ async function getZip() {
     const h = (heads[k] = heads[k] || {}); h[head] = (h[head] || 0) + 1;
   }
 
+  // Po liniji: cijele vožnje (sve stanice i vremena) – za prikaz rute u redu vožnje
+  const perRoute = {};
+  for (const id in trips) {
+    const tr = trips[id];
+    if (tr.st.length < 2) continue;
+    const rs = routes[tr.r].s;
+    const R = (perRoute[rs] = perRoute[rs] || { n: [], ni: {}, p: [], pi: {}, f: [], fi: {}, h: [], hi: {}, t: {} });
+    const nIdx = tr.st.map(x => { if (!(x[1] in R.ni)) { R.ni[x[1]] = R.n.length; R.n.push(x[1]); } return R.ni[x[1]]; });
+    const pk = nIdx.join(',') + '|' + tr.st.map(x => x[0]).join(',');
+    if (!(pk in R.pi)) { R.pi[pk] = R.p.length; R.p.push([nIdx, tr.st.map(x => x[0])]); }
+    const t0 = tr.st[0][2], prof = tr.st.map(x => x[2] - t0), fk = prof.join(',');
+    if (!(fk in R.fi)) { R.fi[fk] = R.f.length; R.f.push(prof); }
+    const head = tr.h || tr.st[tr.st.length - 1][1];
+    if (!(head in R.hi)) { R.hi[head] = R.h.length; R.h.push(head); }
+    R.t[id] = [R.pi[pk], R.fi[fk], t0, tr.d, R.hi[head]];
+  }
+
   // Indeks stanica
   const stopList = Object.keys(perStop).sort((a, b) => a.localeCompare(b, 'hr'));
   const stopId = {}; stopList.forEach((n, i) => { stopId[n] = i; });
@@ -267,6 +285,16 @@ async function getZip() {
     bytes += s.length;
     fs.writeFileSync(path.join(OUT, 's', i + '.json'), s);
   });
+  fs.rmSync(path.join(OUT, 'r'), { recursive: true, force: true });
+  fs.mkdirSync(path.join(OUT, 'r'), { recursive: true });
+  let rBytes = 0;
+  for (const rs in perRoute) {
+    const R = perRoute[rs];
+    const out = JSON.stringify({ n: R.n, p: R.p, f: R.f, h: R.h, t: R.t });
+    rBytes += out.length;
+    fs.writeFileSync(path.join(OUT, 'r', routeFile(rs) + '.json'), out);
+  }
+  console.log('Vožnje po linijama: ' + Object.keys(perRoute).length + ' datoteka (' + (rBytes / 1e6).toFixed(1) + ' MB)');
   fs.writeFileSync(path.join(OUT, 'stops.json'), JSON.stringify(stopsOut));
   fs.writeFileSync(path.join(OUT, 'lines.json'), JSON.stringify(lineList));
   fs.writeFileSync(path.join(OUT, 'services.json'), JSON.stringify(services));

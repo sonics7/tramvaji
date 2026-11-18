@@ -20,6 +20,7 @@
     <button data-mode="live">Polasci uživo</button>
     <button data-mode="tt">Red vožnje</button>
   </nav>
+  <button id="mapBtn" class="iconbtn" aria-label="Karta vozila uživo">🗺️</button>
   <button id="newsBtn" class="iconbtn hidden" aria-label="Obavijesti ZET-a">📢<span id="newsCount" class="count hidden"></span></button>
 </div>
 <header class="top">
@@ -61,9 +62,9 @@
 <div id="sheet" class="sheet hidden" role="dialog">
   <div class="sheet-card">
     <div class="sheet-head">
-      <button class="link" data-close>Gotovo</button>
-      <h2 id="sheetTitle">Uredi</h2>
       <span class="spacer"></span>
+      <h2 id="sheetTitle">Uredi</h2>
+      <button class="done" data-close>Gotovo</button>
     </div>
     <div id="sheetBody" class="sheet-body"></div>
   </div>

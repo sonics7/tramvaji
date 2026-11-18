@@ -80,7 +80,9 @@ main { padding: 8px 12px 24px; }
 .sheet-card { background: #1a2340; width: 100%; max-width: 640px; height: 92vh; border-radius: 18px 18px 0 0; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
 .sheet-head { display: flex; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .sheet-head h2 { flex: 1; text-align: center; margin: 0; font-size: 17px; }
-.sheet-head .spacer, .sheet-head .link { width: 70px; text-align: left; }
+.sheet-head .spacer { width: 92px; flex: none; }
+.done { flex: none; width: 92px; padding: 9px 0; border-radius: 999px; background: var(--accent); color: #0d1430; font-weight: 800; font-size: 15px; box-shadow: 0 2px 10px rgba(110,160,255,.35); }
+.done::before { content: '✓ '; }
 .sheet-body { overflow-y: auto; padding: 14px; flex: 1; -webkit-overflow-scrolling: touch; }
 .field { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: #10172c; color: var(--text); font-size: 16px; }
 .label { color: var(--muted); font-size: 13px; margin: 18px 0 6px; text-transform: uppercase; letter-spacing: 1px; }
@@ -216,3 +218,42 @@ body.mode-tt main { padding-top: 12px; }
 .cal-d:disabled { opacity: .25; cursor: default; }
 .cal-quick { display: flex; gap: 8px; margin-top: 14px; }
 .cal-quick .btn { flex: 1; }
+
+/* Polasci u redu vožnje su gumbi */
+button.tt-t { border: 0; font-family: inherit; color: inherit; cursor: pointer; }
+button.tt-t:active { outline: 2px solid var(--accent); }
+
+/* Cijela vožnja */
+.trip-sum { display: flex; gap: 12px; align-items: center; background: var(--card); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+.trip-sum b { display: block; font-size: 16px; }
+.trip-sum small { color: var(--muted); font-size: 13px; }
+.live-txt { color: var(--live); font-weight: 700; }
+.trip { background: var(--card); border-radius: 14px; padding: 6px 12px; }
+.tr { display: grid; grid-template-columns: 62px 22px 1fr; align-items: stretch; min-height: 40px; }
+.tr .tm { display: flex; flex-direction: column; justify-content: center; text-align: right; font-variant-numeric: tabular-nums; font-size: 16px; }
+.tr .tm s { color: var(--sched); font-size: 12px; }
+.tr .ln { position: relative; }
+.tr .ln::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: var(--tram); }
+.tr.first .ln::before { top: 50%; } .tr.last .ln::before { bottom: 50%; }
+.tr .ln i { position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: #1a2340; border: 3px solid var(--tram); box-sizing: border-box; }
+.tr.first .ln i, .tr.last .ln i { width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; background: var(--tram); }
+.tr .nm { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 15px; }
+.tr .nm em { font-style: normal; font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 6px; }
+.tr .nm em.late { background: #5a3040; color: #ffb3b6; } .tr .nm em.early { background: #23452f; color: #9be3a8; }
+.tr.past { opacity: .45; }
+.tr.cur .ln i { background: var(--live); border-color: var(--live); }
+.tr.sel { background: rgba(110,160,255,.16); border-radius: 10px; margin: 0 -8px; padding: 0 8px; grid-template-columns: 62px 22px 1fr; }
+.tr.sel .nm { font-weight: 800; }
+.tr.sel .ln i { background: var(--accent); border-color: #fff; }
+
+/* Obavijesti: sve pročitano */
+.readall { margin: 0 0 12px; }
+.readok { margin: 0 0 12px; color: var(--live); }
+
+/* Karta vozila */
+.sheet.tall .sheet-card { height: 96vh; }
+.sheet-body.flush { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.mapwrap { flex: 1; position: relative; }
+.mapwrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #e8e8e8; }
+.mapnote { padding: 8px 14px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
+.mapnote a { color: var(--accent); font-weight: 600; text-decoration: none; }
