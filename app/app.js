@@ -238,6 +238,15 @@
     });
     news.sort((a, b) => (b.urgent - a.urgent) || (b.relevant - a.relevant) || (b.at - a.at));
   }
+  // ZET u okvir izvanredne obavijesti stalno stavlja i opću rečenicu („Servisne informacije pratite…”).
+  // Nju preskačemo; ako osim nje nema ničega, to nije prava obavijest.
+  const BOILER = /servisne informacije pratite|doznajte pozivom na broj|072\s*500\s*400/i;
+  function cleanNews(n) {
+    if (!n || !n.urgent) return n;
+    const ls = String(n.text || n.title || '').split('\n').map(s => s.trim()).filter(s => s && !BOILER.test(s));
+    if (!ls.length) return null;
+    return Object.assign({}, n, { title: ls[0].slice(0, 140), text: ls.join('\n') });
+  }
   async function loadNews() {
     if (!newsUrl || Date.now() - newsAt < NEWS_EVERY - 5000) return;
     newsAt = Date.now();
@@ -245,7 +254,7 @@
       const r = await fetch(newsUrl, { cache: 'no-store' });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      news = (j.items || []).filter(n => n && n.title);
+      news = (j.items || []).map(cleanNews).filter(n => n && n.title);
     } catch (e) { newsAt = Date.now() - NEWS_EVERY + 60e3; }   // novi pokušaj za minutu
     renderBanner();
   }
