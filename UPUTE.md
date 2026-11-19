@@ -76,6 +76,7 @@ Supruga isto na svom A54 – njene grupe i linije su samo njene.
   **Dodir na vrijeme** otvara cijelu tu vožnju: sve stanice od polazne do zadnje s vremenom prolaska,
   tvoja stanica je istaknuta. Danas su prođene stanice blijede, a ako je vozilo u podacima uživo,
   uz vremena piše kašnjenje (+3 min) i procijenjeno vrijeme.
+- **Donji izbornik** (traka na dnu ekrana): Uživo · Stanica · Red vožnje · Karta · Obavijesti.
 - **Stanica** (srednja kartica) – odabereš jednu stanicu (pretraga ili 📍 najbliža) i vidiš sve
   tramvaje i autobuse koji kroz nju prolaze u sljedeća 2 sata, u oba smjera, s kašnjenjem uživo.
   Filtar Sve / Tramvaji / Autobusi; zadnjih 6 stanica ostaje kao prečaci. Dodir na polazak otvara cijelu vožnju.

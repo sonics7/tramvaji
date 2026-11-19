@@ -252,7 +252,6 @@
   function renderBanner() {
     classify();
     const unread = news.filter(n => n.relevant && seen.indexOf(n.id) < 0);
-    $('#newsBtn').classList.toggle('hidden', !news.length);
     $('#newsCount').classList.toggle('hidden', !unread.length);
     $('#newsCount').textContent = unread.length;
     const b = $('#banner');

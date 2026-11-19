@@ -15,15 +15,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="modebar">
-  <nav id="modes" class="modes">
-    <button data-mode="live">Uživo</button>
-    <button data-mode="st">Stanica</button>
-    <button data-mode="tt">Red vožnje</button>
-  </nav>
-  <button id="mapBtn" class="iconbtn" aria-label="Karta vozila uživo">🗺️</button>
-  <button id="newsBtn" class="iconbtn hidden" aria-label="Obavijesti ZET-a">📢<span id="newsCount" class="count hidden"></span></button>
-</div>
+
 <header class="top">
   <nav id="tabs" class="tabs"></nav>
   <button id="editBtn" class="iconbtn" aria-label="Uredi">✎</button>
@@ -77,6 +69,14 @@
     <div id="sheetBody" class="sheet-body"></div>
   </div>
 </div>
+
+<nav id="modes" class="tabbar" aria-label="Izbornik">
+  <button data-mode="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg><span>Uživo</span></button>
+  <button data-mode="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/></svg><span>Stanica</span></button>
+  <button data-mode="tt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Red vožnje</span></button>
+  <button id="mapBtn" aria-label="Karta vozila uživo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z"/><path d="M9 4v14M15 6v14"/></svg><span>Karta</span></button>
+  <button id="newsBtn" aria-label="Obavijesti ZET-a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8.5-3 8.5h18S18 15 18 8z"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/></svg><span>Obavijesti</span><b id="newsCount" class="count hidden"></b></button>
+</nav>
 
 <script src="config.js"></script>
 <script src="app.js"></script>
