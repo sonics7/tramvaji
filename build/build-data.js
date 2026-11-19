@@ -79,7 +79,7 @@ async function getZip() {
   // Rezerva: ako zet.hr odbije GitHub, preko vlastitog Workera (/gtfs)
   try {
     const cfg = fs.readFileSync(path.join(OUT, '..', 'config.js'), 'utf8');
-    const m = /rtUrl\s*:\s*['"]([^'"]+)['"]/.exec(cfg);
+    const m = /^\s*rtUrl\s*:\s*['"]([^'"]+)['"]/m.exec(cfg);   // samo prava postavka, ne primjer u komentaru
     if (m && /^https:/.test(m[1])) urls.push(m[1].replace(/\/rt\/?$/, '') + '/gtfs');
   } catch (e) {}
   let last;
