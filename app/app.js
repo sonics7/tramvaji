@@ -20,7 +20,9 @@
     S = { cur: 0, groups: [{ name: 'Od kuće', items: [] }, { name: 'S posla', items: [] }] };
   }
   if (!(S.cur >= 0 && S.cur < S.groups.length)) S.cur = 0;
-  if (S.mode !== 'tt') S.mode = 'live';
+  if (S.mode !== 'tt' && S.mode !== 'st') S.mode = 'live';
+  if (!S.st || typeof S.st !== 'object') S.st = { stop: null, recent: [], f: 'all' };
+  if (!Array.isArray(S.st.recent)) S.st.recent = [];
   if (!Array.isArray(S.ttFav)) S.ttFav = S.tt ? [S.tt] : [];
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
   const group = () => S.groups[S.cur];
@@ -128,14 +130,17 @@
 
   // ---------------- Polasci ----------------
   function departures(file, item, now) {
+    return depList(file, now, t => t[1] === item.route && t[2] === item.dir, 14 * 3600e3).slice(0, 3);
+  }
+  function depList(file, now, want, ahead) {
     const live = Date.now() - rt.at < 3 * 60e3;
     const days = [-1, 0, 1].map(k => { const d = new Date(now); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + k); return d; });
     const list = [];
     for (const t of file.t) {
-      if (t[1] !== item.route || t[2] !== item.dir) continue;
+      if (!want(t)) continue;
       for (const d of days) {
         const sched = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, t[5]).getTime(); // točno i kod promjene ljetnog/zimskog vremena
-        if (sched < now - 30 * 60e3 || sched > now + 14 * 3600e3) continue;
+        if (sched < now - 30 * 60e3 || sched > now + ahead) continue;
         if (!svcOn(t[4], ymd(d), d.getDay())) continue;
         let at = sched, isLive = false;
         const r = live && rt.trips[t[0]];
@@ -153,11 +158,11 @@
         if (at < now - 20e3) continue;
         const key = t[0] + '@' + d.getTime();
         if (list.some(x => x.key === key)) continue;      // ista vožnja dvaput na istoj stanici
-        list.push({ key, at, sched, live: isLive, head: file.h[t[3]] });
+        list.push({ key, at, sched, live: isLive, head: file.h[t[3]], trip: t[0], route: t[1], day: d.getTime() });
       }
     }
     list.sort((a, b) => a.at - b.at);
-    return list.slice(0, 3);
+    return list;
   }
 
   // ---------------- Glavni prikaz ----------------
@@ -279,9 +284,11 @@
   function setMode(m) {
     S.mode = m; save();
     document.body.classList.toggle('mode-tt', m === 'tt');
+    document.body.classList.toggle('mode-st', m === 'st');
     $('#tt').classList.toggle('hidden', m !== 'tt');
+    $('#st').classList.toggle('hidden', m !== 'st');
     document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
-    if (m === 'tt') { ttOpen = false; ttEdit = false; renderTT(false); } else refresh();
+    if (m === 'tt') { ttOpen = false; ttEdit = false; renderTT(false); } else if (m === 'st') { window.scrollTo(0, 0); renderST(); loadRt().then(renderST); } else refresh();
   }
   function ttPicks() {
     const seen = {}, out = [];
@@ -400,6 +407,54 @@
     if (scroll && nowSec != null) { const n = box.querySelector('.tt-t.next'); if (n) n.closest('.tt-row').scrollIntoView({ block: 'center' }); }
   }
 
+  // ---------------- Svi polasci sa stanice (sljedeća 2 sata) ----------------
+  const ST_AHEAD = 2 * 3600e3;
+  let stDrawing = 0;
+  function chooseStop(name) {
+    S.st.stop = name;
+    S.st.recent = [name].concat(S.st.recent.filter(n => n !== name)).slice(0, 6);
+    save();
+  }
+  async function renderST() {
+    const my = ++stDrawing, st = S.st;
+    const chips = st.recent.length > 1 || (st.recent.length && !st.stop)
+      ? '<div class="st-chips">' + st.recent.map(n => '<button class="st-chip' + (n === st.stop ? ' on' : '') + '" data-stgo="' + esc(n) + '">' + esc(n) + '</button>').join('') + '</div>' : '';
+    if (!st.stop) {
+      $('#stHead').innerHTML = '<div class="st-intro"><b>Svi polasci s jedne stanice</b>Odaberi stanicu i vidjet ćeš sve tramvaje i autobuse koji kroz nju prolaze u sljedeća 2 sata, u oba smjera.</div>' +
+        '<div class="st-acts"><button class="btn" data-act="stpick">🔍 Odaberi stanicu</button><button class="btn ghost" data-act="stnear">📍 Najbliža stanica</button></div>' + chips;
+      $('#stList').innerHTML = ''; $('#stList').classList.add('hidden'); $('#stNote').textContent = '';
+      return;
+    }
+    const f = st.f || 'all';
+    $('#stHead').innerHTML = '<div class="st-top"><div class="st-name"><small>STANICA</small><b>' + esc(st.stop) + '</b></div><button class="btn sm" data-act="stpick">Promijeni</button></div>' + chips +
+      '<div class="seg st-f">' + [['all', 'Sve'], ['tram', 'Tramvaji'], ['bus', 'Autobusi']].map(x => '<button data-stf="' + x[0] + '" class="' + (f === x[0] ? 'on' : '') + '">' + x[1] + '</button>').join('') + '</div>';
+    $('#stList').classList.remove('hidden');
+    let file;
+    try { await loadBase(); await getLines(); file = await stopFile(st.stop); } catch (e) {
+      if (my === stDrawing) $('#stList').innerHTML = '<div class="empty">Vozni red nije dostupan.<br><small>' + esc(e.message) + '</small></div>';
+      return;
+    }
+    if (my !== stDrawing) return;
+    if (!file) { $('#stList').innerHTML = '<div class="empty">Ova stanica više nije u voznom redu.</div>'; return; }
+    const isBus = {}; lines.forEach(l => { isBus[l.r] = l.bus; });
+    const now = Date.now();
+    const all = depList(file, now, t => f === 'all' || (f === 'bus') === !!isBus[t[1]], ST_AHEAD + 30 * 60e3).filter(x => x.at <= now + ST_AHEAD);
+    const hm = ms => { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+    $('#stList').innerHTML = all.length ? all.map(x => {
+      const m = Math.floor((x.at - now) / 60e3), dl = x.live ? Math.round((x.at - x.sched) / 60e3) : 0;
+      return '<button class="st-row" data-trip="' + esc(x.trip) + '" data-route="' + esc(x.route) + '" data-stop="' + esc(st.stop) + '" data-day="' + x.day + '">' +
+        '<span class="st-t"><b>' + hm(x.at) + '</b><small' + (m < 1 ? ' class="now"' : '') + '>' + (m < 1 ? 'sada' : 'za ' + m + ' min') + '</small></span>' +
+        badge(x.route, isBus[x.route]) +
+        '<span class="st-to">→ ' + esc(x.head) + '</span>' +
+        (dl ? '<em class="' + (dl > 0 ? 'late' : 'early') + '">' + (dl > 0 ? '+' : '−') + Math.abs(dl) + '</em>' : '') +
+        '<span class="dot' + (x.live ? ' live' : '') + '"></span></button>';
+    }).join('') : '<div class="empty">U sljedeća 2 sata nema polazaka' + (f === 'all' ? '' : f === 'bus' ? ' autobusa' : ' tramvaja') + ' s ove stanice.</div>';
+    const parts = ['Sljedeća 2 sata · ' + all.length + ' ' + (all.length % 10 === 1 && all.length % 100 !== 11 ? 'polazak' : 'polazaka')];
+    if (rtErr) parts.push('uživo nedostupno – po voznom redu');
+    else if (rt.at) { const d = new Date(rt.at); parts.push('uživo ' + d.getHours() + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds())); }
+    $('#stNote').textContent = parts.join(' · ') + '. Dodirni polazak za cijelu vožnju.';
+  }
+
   // ---------------- Cijela vožnja (sve stanice i vremena) ----------------
   const routeFiles = {};
   const routeFile = r => String(r).replace(/[^A-Za-z0-9]/g, '_');
@@ -445,7 +500,7 @@
     body().innerHTML =
       '<div class="trip-sum">' + badge(v.route, L.bus) + '<div><b>' + esc(first.name) + ' → ' + esc(head) + '</b><small>' + esc(dayTxt) + ' · ' + rows.length + ' stanica · ' + mins + ' min vožnje' +
       (r ? ' · <span class="live-txt">● uživo</span>' : '') + '</small></div></div>' +
-      '<div class="trip">' + rows.map((x, k) => {
+      '<div class="trip' + (L.bus ? ' bus' : '') + '">' + rows.map((x, k) => {
         const sel = x.name === v.stop ? ' sel' : '', past = k <= passed ? ' past' : '', cur = k === passed && k < rows.length - 1 ? ' cur' : '';
         const d = x.est != null ? Math.round((x.est - x.sched) / 60e3) : 0;
         const time = x.est != null && d !== 0
@@ -463,7 +518,7 @@
   // ---------------- Uređivanje ----------------
   let view = null;
   function openSheet(v) { view = v; $('#sheet').classList.remove('hidden'); $('#sheet').classList.toggle('compact', v.v === 'cal'); $('#sheet').classList.toggle('tall', v.v === 'map'); $('#banner').classList.add('hidden'); renderSheet(); }
-  function closeSheet() { $('#sheet').classList.add('hidden'); view = null; pickTT = false; save(); renderTabs(); renderBanner(); if (S.mode === 'tt') renderTT(true); else { draw(); loadRt().then(draw); } }
+  function closeSheet() { $('#sheet').classList.add('hidden'); view = null; pickTT = false; save(); renderTabs(); renderBanner(); if (S.mode === 'tt') renderTT(true); else if (S.mode === 'st') renderST(); else { draw(); loadRt().then(draw); } }
   function setTitle(t) { $('#sheetTitle').textContent = t; }
   const body = () => $('#sheetBody');
 
@@ -479,6 +534,17 @@
       return;
     }
     if (view.v === 'trip') { renderTrip(); return; }
+    if (view.v === 'stpick') {
+      setTitle('Odaberi stanicu');
+      body().innerHTML = '<input id="q" class="field" placeholder="Upiši naziv stanice" value="' + esc(view.q || '') + '" autocomplete="off">' +
+        '<button class="link" data-act="near">📍 Najbliže stanice</button><div id="res" class="list" style="margin-top:8px"></div>';
+      const q = $('#q');
+      q.addEventListener('input', () => { view.q = q.value; view.near = null; stopResults(); });
+      if (!lines) getLines().then(stopResults).catch(() => {});
+      stopResults();
+      if (!view.q && !view.near) setTimeout(() => q.focus(), 50);
+      return;
+    }
     if (view.v === 'cal') {
       // Vlastiti kalendar: hrvatski nazivi, tjedan od ponedjeljka
       setTitle('Odaberi datum');
@@ -715,7 +781,12 @@
     if (t.id === 'editBtn') { openSheet({ v: 'group' }); return; }
     if (t.id === 'newsBtn') { openSheet({ v: 'news' }); return; }
     if (t.id === 'mapBtn') { openSheet({ v: 'map' }); return; }
-    if (t.dataset.trip) { openSheet({ v: 'trip', trip: t.dataset.trip, route: S.tt.route, stop: S.tt.stop, day: new Date(ttDay.getTime()) }); return; }
+    if (t.dataset.trip) {
+      const dd = t.dataset.day ? new Date(+t.dataset.day) : new Date(ttDay.getTime());
+      openSheet({ v: 'trip', trip: t.dataset.trip, route: t.dataset.route || S.tt.route, stop: t.dataset.stop || S.tt.stop, day: dd }); return;
+    }
+    if (t.dataset.stgo != null) { chooseStop(t.dataset.stgo); renderST(); return; }
+    if (t.dataset.stf) { S.st.f = t.dataset.stf; save(); renderST(); return; }
     if (t.id === 'bClose') { e.stopPropagation(); markRead(news.filter(n => n.relevant)); renderBanner(); return; }
     if (t.hasAttribute('data-close')) { closeSheet(); return; }
     const g = group(), a = t.dataset.act;
@@ -730,6 +801,7 @@
       const D = view.di >= 0 ? L.d[view.di] : (L.d.find(d => d.s.indexOf(si) >= 0 && d.s.indexOf(si) < d.s.length - 1) || L.d.find(d => d.s.indexOf(si) >= 0) || L.d[0]);
       addItem(L.r, D.d, stops[si].n, D.h, L.bus); return;
     }
+    if (t.dataset.si != null && view && view.v === 'stpick') { chooseStop(stops[+t.dataset.si].n); closeSheet(); window.scrollTo(0, 0); loadRt().then(renderST); return; }
     if (t.dataset.si != null) { view = { v: 'stopLines', si: +t.dataset.si, tab: 'stop', q: view.q, near: view.near }; renderSheet(); return; }
     if (t.dataset.addr != null) { addItem(t.dataset.addr, +t.dataset.adir, stops[view.si].n, t.dataset.ahead, t.dataset.abus === '1'); return; }
     switch (a) {
@@ -738,6 +810,17 @@
         break;
       case 'toLines': view = { v: 'lines', tab: view.tab || 'tram', q: view.q, near: view.near }; renderSheet(); break;
       case 'toDir': view = { v: 'dir', line: view.line, tab: view.tab }; renderSheet(); break;
+      case 'stpick': openSheet({ v: 'stpick', q: '' }); break;
+      case 'stnear':
+        try {
+          await loadBase();
+          toast('Tražim lokaciju…');
+          const c = await locate();
+          let best = null;
+          stops.forEach(s => { if (s.lat == null) return; const d = distM(c.latitude, c.longitude, s.lat, s.lon); if (!best || d < best.d) best = { n: s.n, d }; });
+          if (best) { chooseStop(best.n); toast('Najbliža: ' + best.n + ' (' + fmtDist(best.d) + ')'); renderST(); loadRt().then(renderST); }
+        } catch (err) { toast(err.message); }
+        break;
       case 'readall': markRead(news); renderBanner(); renderSheet(); break;
       case 'newgroup': {
         const name = (prompt('Naziv nove grupe (npr. Posao, Škola):') || '').trim();
@@ -795,8 +878,10 @@
   setInterval(() => { if (!document.hidden) loadNews(); }, 60e3);
   setInterval(() => { if (!document.hidden && !view && S.mode === 'live') draw(); }, DRAW_EVERY);
   setInterval(() => { if (!document.hidden && !view && S.mode === 'tt') renderTT(false); }, 60e3);
+  setInterval(() => { if (!document.hidden && !view && S.mode === 'st' && S.st.stop) renderST(); }, DRAW_EVERY);
+  setInterval(() => { if (!document.hidden && !view && S.mode === 'st' && S.st.stop) loadRt().then(renderST); }, RT_EVERY);
   setInterval(() => { if (!document.hidden && !view && S.mode === 'live' && group().items.length) loadRt().then(draw); }, RT_EVERY);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { loadNews(); if (!view) { if (S.mode === 'tt') renderTT(false); else refresh(); } } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { loadNews(); if (!view) { if (S.mode === 'tt') renderTT(false); else if (S.mode === 'st') { renderST(); loadRt().then(renderST); } else refresh(); } } });
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
   // za testiranje

@@ -17,7 +17,8 @@
 <body>
 <div class="modebar">
   <nav id="modes" class="modes">
-    <button data-mode="live">Polasci uživo</button>
+    <button data-mode="live">Uživo</button>
+    <button data-mode="st">Stanica</button>
     <button data-mode="tt">Red vožnje</button>
   </nav>
   <button id="mapBtn" class="iconbtn" aria-label="Karta vozila uživo">🗺️</button>
@@ -37,6 +38,13 @@
     <div id="rows"></div>
   </section>
   <p id="status" class="status"></p>
+
+  <!-- Svi polasci s jedne stanice (sljedeća 2 sata) -->
+  <section id="st" class="hidden">
+    <div id="stHead" class="board st-head"></div>
+    <div id="stList" class="board st-list hidden"></div>
+    <p id="stNote" class="status"></p>
+  </section>
 
   <!-- Red vožnje za odabrani dan -->
   <section id="tt" class="tt hidden">
